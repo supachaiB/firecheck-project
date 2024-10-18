@@ -1,0 +1,34 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'inspection_history.dart'; // Import ไฟล์ inspection_history.dart
+import 'dashboard.dart'; // Import ไฟล์ dashboard.dart
+import 'fire_tank_status.dart'; // Import ไฟล์ fire_tank_status.dart
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Firecheck System',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      home: const DashboardPage(), // เปลี่ยนให้หน้าแรกเป็น DashboardPage
+      routes: {
+        '/firetankstatus': (context) => FireTankStatusPage(),
+        '/inspectionhistory': (context) => InspectionHistoryPage(),
+      },
+    );
+  }
+}
