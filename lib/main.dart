@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'inspection_history.dart'; // Import ไฟล์ inspection_history.dart
-import 'dashboard.dart'; // Import ไฟล์ dashboard.dart
-import 'fire_tank_status.dart'; // Import ไฟล์ fire_tank_status.dart
+import 'admin/inspection_history.dart'; // Import ไฟล์ inspection_history.dart
+import 'admin/dashboard.dart'; // Import ไฟล์ dashboard.dart
+import 'admin/fire_tank_status.dart'; // Import ไฟล์ fire_tank_status.dart
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
