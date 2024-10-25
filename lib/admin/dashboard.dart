@@ -10,6 +10,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int selectedYear = DateTime.now().year;
+  String selectedUserType = 'User'; // ตัวแปรสำหรับ dropdown user/admin
 
   @override
   Widget build(BuildContext context) {
@@ -24,16 +25,16 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // โซน 1: สถานะรวมของถังดับเพลิง
+            // โซน 1: สถานะรวมของถังดับเพลิง พร้อม dropdown ประเภทผู้ใช้
             _buildSectionTitle('สถานะรวมของถังดับเพลิง'),
             const SizedBox(height: 10),
             _buildContainerWithPadding(
-              child: _buildStatusCards(),
+              child: _buildStatusCards(), // สถานะรวมของถังดับเพลิง
             ),
             const SizedBox(height: 20),
 
             // โซน 2: เลือกปีและกราฟ
-            _buildSectionTitle('การดูข้อมูลของกราฟ'),
+            _buildSectionTitle('ข้อมูลของกราฟ'),
             const SizedBox(height: 10),
             _buildContainerWithPadding(
               child: Column(
@@ -98,6 +99,23 @@ class _DashboardPageState extends State<DashboardPage> {
                   '/inspectionhistory'); // ลิงก์ไปหน้าประวัติการตรวจสอบ
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.build),
+            title: const Text('การจัดการถังดับเพลิง'),
+            onTap: () {
+              Navigator.pushNamed(context,
+                  '/fire_tank_management'); // ลิงก์ไปหน้าการจัดการถังดับเพลิง
+            },
+          ),
+          const Divider(), // เส้นแบ่งเพื่อแยกปุ่มออกจากเมนูอื่น ๆ
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('ออกจากระบบ'),
+            onTap: () {
+              Navigator.pushReplacementNamed(
+                  context, '/user'); // ลิงก์ไปหน้า user.dart
+            },
+          ),
         ],
       ),
     );
@@ -112,6 +130,38 @@ class _DashboardPageState extends State<DashboardPage> {
         fontWeight: FontWeight.bold,
         color: Colors.black87,
       ),
+    );
+  }
+
+  // Dropdown สำหรับเลือกประเภทผู้ใช้
+  Widget _buildUserTypeDropdown() {
+    return Row(
+      mainAxisAlignment:
+          MainAxisAlignment.spaceBetween, // จัดให้ dropdown ไปอยู่ทางขวา
+      children: [
+        const Text(
+          'ประเภทผู้ใช้:',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        DropdownButton<String>(
+          value: selectedUserType,
+          items: const [
+            DropdownMenuItem(
+              value: 'User',
+              child: Text('User'),
+            ),
+            DropdownMenuItem(
+              value: 'Admin',
+              child: Text('Admin'),
+            ),
+          ],
+          onChanged: (value) {
+            setState(() {
+              selectedUserType = value!;
+            });
+          },
+        ),
+      ],
     );
   }
 
@@ -137,34 +187,42 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // ส่วนแสดงการ์ดสถานะ
   Widget _buildStatusCards() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _buildStatusCard(
-            color: Colors.green,
-            title: 'ถังที่พร้อมใช้งาน',
-            count: '12',
-            icon: Icons.check_circle,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _buildStatusCard(
-            color: Colors.red,
-            title: 'ถังชำรุด',
-            count: '3',
-            icon: Icons.error,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _buildStatusCard(
-            color: Colors.orange,
-            title: 'ถังส่งซ่อม',
-            count: '2',
-            icon: Icons.build,
-          ),
+        _buildUserTypeDropdown(), // Dropdown ประเภทผู้ใช้ อยู่ในส่วนของการ์ดสถานะ
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: _buildStatusCard(
+                color: Colors.green,
+                title: 'ถังที่พร้อมใช้งาน',
+                count: '12',
+                icon: Icons.check_circle,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildStatusCard(
+                color: Colors.red,
+                title:
+                    'ยังไม่ตรวจสอบ', // เปลี่ยนจาก "ถังชำรุด" เป็น "ยังไม่ตรวจสอบ"
+                count: '3',
+                icon: Icons.error,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildStatusCard(
+                color: Colors.orange,
+                title: 'ถังส่งซ่อม',
+                count: '2',
+                icon: Icons.build,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -255,12 +313,13 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  BarChartGroupData _buildBarGroup(int x, int ready, int damaged, int repair) {
+  BarChartGroupData _buildBarGroup(
+      int x, int ready, int notChecked, int repair) {
     return BarChartGroupData(
       x: x,
       barRods: [
         BarChartRodData(toY: ready.toDouble(), color: Colors.green),
-        BarChartRodData(toY: damaged.toDouble(), color: Colors.red),
+        BarChartRodData(toY: notChecked.toDouble(), color: Colors.red),
         BarChartRodData(toY: repair.toDouble(), color: Colors.orange),
       ],
     );

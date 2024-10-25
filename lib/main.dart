@@ -4,6 +4,8 @@ import 'firebase_options.dart';
 import 'admin/inspection_history.dart'; // Import ไฟล์ inspection_history.dart
 import 'admin/dashboard.dart'; // Import ไฟล์ dashboard.dart
 import 'admin/fire_tank_status.dart'; // Import ไฟล์ fire_tank_status.dart
+import 'user/user.dart';
+import 'admin/Fire_tank_management.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,8 +28,11 @@ class MyApp extends StatelessWidget {
       ),
       home: const DashboardPage(), // เปลี่ยนให้หน้าแรกเป็น DashboardPage
       routes: {
+        // เพิ่ม route
         '/firetankstatus': (context) => FireTankStatusPage(),
         '/inspectionhistory': (context) => InspectionHistoryPage(),
+        '/user': (context) => UserPage(),
+        '/fire_tank_management': (context) => FireTankManagementPage(),
       },
     );
   }

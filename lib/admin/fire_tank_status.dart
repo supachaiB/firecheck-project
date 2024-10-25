@@ -22,7 +22,7 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
                   ? "พร้อมใช้งาน"
                   : (tankIndex % 3 == 1)
                       ? "ส่งซ่อม"
-                      : "ชำรุด",
+                      : "ยังไม่ตรวจสอบ",
               "lastChecked": "2024-10-${(tankIndex + 1) * 2}",
             };
           })
@@ -78,7 +78,7 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
         for (var tank in floor['tanks']) {
           if (tank['status'] == 'พร้อมใช้งาน') readyCount++;
           if (tank['status'] == 'ส่งซ่อม') repairCount++;
-          if (tank['status'] == 'ชำรุด') brokenCount++;
+          if (tank['status'] == 'ยังไม่ตรวจสอบ') brokenCount++;
         }
       }
     }
@@ -93,7 +93,7 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
           children: [
             _buildSummaryCard("พร้อมใช้งาน", readyCount, Colors.green),
             _buildSummaryCard("ส่งซ่อม", repairCount, Colors.orange),
-            _buildSummaryCard("ชำรุด", brokenCount, Colors.red),
+            _buildSummaryCard("ยังไม่ตรวจสอบ", brokenCount, Colors.red),
           ],
         ),
       ),
@@ -191,7 +191,8 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
                     value: selectedStatus,
                     hint: Text("กรองตามสถานะ"),
                     isExpanded: true,
-                    items: ['พร้อมใช้งาน', 'ส่งซ่อม', 'ชำรุด'].map((status) {
+                    items: ['พร้อมใช้งาน', 'ส่งซ่อม', 'ยังไม่ตรวจสอบ']
+                        .map((status) {
                       return DropdownMenuItem<String>(
                         value: status,
                         child: Text(status),
