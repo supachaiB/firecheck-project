@@ -78,6 +78,7 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
         for (var tank in floor['tanks']) {
           if (tank['status'] == 'พร้อมใช้งาน') readyCount++;
           if (tank['status'] == 'ส่งซ่อม') repairCount++;
+          if (tank['status'] == 'ชำรุด') brokenCount++;
           if (tank['status'] == 'ยังไม่ตรวจสอบ') brokenCount++;
         }
       }
@@ -93,7 +94,8 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
           children: [
             _buildSummaryCard("พร้อมใช้งาน", readyCount, Colors.green),
             _buildSummaryCard("ส่งซ่อม", repairCount, Colors.orange),
-            _buildSummaryCard("ยังไม่ตรวจสอบ", brokenCount, Colors.red),
+            _buildSummaryCard("ชำรุด", brokenCount, Colors.red),
+            _buildSummaryCard("ยังไม่ตรวจสอบ", brokenCount, Colors.grey),
           ],
         ),
       ),
@@ -191,7 +193,7 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
                     value: selectedStatus,
                     hint: Text("กรองตามสถานะ"),
                     isExpanded: true,
-                    items: ['พร้อมใช้งาน', 'ส่งซ่อม', 'ยังไม่ตรวจสอบ']
+                    items: ['พร้อมใช้งาน', 'ส่งซ่อม', 'ชำรุด', 'ยังไม่ตรวจสอบ']
                         .map((status) {
                       return DropdownMenuItem<String>(
                         value: status,
@@ -253,7 +255,19 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
           return DataRow(
             cells: [
               DataCell(Text(tank['tankNumber'] ?? '')),
-              DataCell(Text(tank['status'] ?? '')),
+              DataCell(
+                Row(
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      color: _getStatusColor(tank['status'] ?? ''),
+                      size: 12,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(tank['status'] ?? ''),
+                  ],
+                ),
+              ),
               DataCell(Text(tank['lastChecked'] ?? '')),
               DataCell(
                 IconButton(
@@ -268,6 +282,22 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
         }).toList(),
       ),
     );
+  }
+
+  // ฟังก์ชันกำหนดสีของจุดตามสถานะ
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'พร้อมใช้งาน':
+        return Colors.green;
+      case 'ส่งซ่อม':
+        return Colors.orange;
+      case 'ชำรุด':
+        return Colors.red;
+      case 'ยังไม่ตรวจสอบ':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
   }
 
   // ฟังก์ชันกรองข้อมูลถังดับเพลิง
@@ -306,7 +336,8 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
             value: updatedStatus,
             hint: Text("เลือกสถานะใหม่"),
             isExpanded: true,
-            items: ['พร้อมใช้งาน', 'ส่งซ่อม', 'ชำรุด'].map((status) {
+            items: ['พร้อมใช้งาน', 'ส่งซ่อม', 'ชำรุด', 'ยังไม่ตรวจสอบ']
+                .map((status) {
               return DropdownMenuItem<String>(
                 value: status,
                 child: Text(status),

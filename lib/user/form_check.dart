@@ -22,9 +22,10 @@ class _FormCheckPageState extends State<FormCheckPage> {
   };
   final TextEditingController _remarkController = TextEditingController();
   final TextEditingController _inspectorController = TextEditingController();
-  List<String> staffList = ['John', 'Jane', 'Doe']; // ตัวอย่างรายชื่อพนักงาน
+  List<String> staffList = []; // ตัวอย่างรายชื่อพนักงาน
   List<String> filteredStaffList = []; // รายชื่อพนักงานที่ตรงกัน
   String? selectedStaff; // ชื่อพนักงานที่ถูกเลือก
+  String? userType; // ประเภทผู้ใช้ที่เลือก
 
   @override
   void initState() {
@@ -53,6 +54,7 @@ class _FormCheckPageState extends State<FormCheckPage> {
     await formChecks.doc(docId).set({
       'date_checked': _dateController.text,
       'inspector': selectedStaff ?? _inspectorController.text,
+      'user_type': userType, // บันทึกประเภทผู้ใช้
       'equipment_status': equipmentStatus,
       'remarks': _remarkController.text,
       'tank_id': widget.tankId, // บันทึก ID ถัง
@@ -93,7 +95,7 @@ class _FormCheckPageState extends State<FormCheckPage> {
                             Text('สถานะ: '),
                             Icon(Icons.circle, color: Colors.green, size: 12),
                             SizedBox(width: 8),
-                            Text('พร้อมใช้งาน'),
+                            Text('ตรวจสอบแล้ว'),
                           ],
                         ),
                         TextButton(
@@ -202,6 +204,44 @@ class _FormCheckPageState extends State<FormCheckPage> {
                           },
                         ),
                       ),
+                    const SizedBox(height: 20),
+
+                    // ประเภทผู้ใช้ dropdown
+                    const Text('ประเภทผู้ใช้'),
+                    DropdownButton<String>(
+                      value: userType,
+                      items: [
+                        DropdownMenuItem(
+                          value: 'ผู้ใช้ทั่วไป',
+                          child: Text('ผู้ใช้ทั่วไป'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ช่างเทคนิค',
+                          child: Text('ช่างเทคนิค'),
+                        ),
+                      ],
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          userType = newValue;
+                        });
+                      },
+                      hint: const Text('เลือกประเภทผู้ใช้'),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // ปุ่มถ่ายภาพ
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        // Placeholder for future photo capture functionality
+                      },
+                      icon: const Icon(Icons.camera_alt),
+                      label: const Text('ถ่ายภาพ'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white, // Updated parameter name
+                      ),
+                    ),
+
                     const SizedBox(height: 20),
                     TextField(
                       controller: _remarkController,

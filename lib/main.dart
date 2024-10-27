@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'admin/inspection_history.dart'; // Import ไฟล์ inspection_history.dart
-import 'admin/dashboard.dart'; // Import ไฟล์ dashboard.dart
-import 'admin/fire_tank_status.dart'; // Import ไฟล์ fire_tank_status.dart
+import 'package:flutter_web_plugins/url_strategy.dart'; // นำเข้าหลังจากเพิ่ม url_strategy
+
+import 'admin/inspection_history.dart';
+import 'admin/dashboard.dart';
+import 'admin/fire_tank_status.dart';
 import 'user/user.dart';
 import 'admin/Fire_tank_management.dart';
+import 'admin/qr_code.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // ตั้งค่า Path-based Routing เพื่อเอา # ออก
+  setUrlStrategy(PathUrlStrategy());
+
   runApp(const MyApp());
 }
 
@@ -26,12 +33,13 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const DashboardPage(), // เปลี่ยนให้หน้าแรกเป็น DashboardPage
+      home: const DashboardPage(),
       routes: {
         // เพิ่ม route
         '/firetankstatus': (context) => FireTankStatusPage(),
         '/inspectionhistory': (context) => InspectionHistoryPage(),
         '/user': (context) => UserPage(),
+        '/qr_code': (context) => QRCodePage(),
         '/fire_tank_management': (context) => FireTankManagementPage(),
       },
     );

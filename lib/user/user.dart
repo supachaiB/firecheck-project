@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+//import 'package:qr_flutter/qr_flutter.dart';
 import 'form_check.dart'; // นำเข้าไฟล์ FormCheckPage
-import 'package:firecheck_setup/admin/dashboard.dart';
 
-// User page to handle logout or other user actions
 class UserPage extends StatelessWidget {
   const UserPage({super.key});
 
@@ -50,14 +48,21 @@ class UserPage extends StatelessWidget {
   }
 }
 
-class MyHomePage extends StatelessWidget {
+class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
 
   final String title;
 
   @override
+  _MyHomePageState createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  final List<String> tankIds = ["fire001", "fire002", "fire003", "fire004"];
+  String? selectedTank; // เก็บถังที่เลือก
+
+  @override
   Widget build(BuildContext context) {
-    List<String> tankIds = ["fire001", "fire002", "fire003", "fire004"];
     return Scaffold(
       drawer: Drawer(
         child: ListView(
@@ -90,28 +95,39 @@ class MyHomePage extends StatelessWidget {
         ),
       ),
       body: Center(
-        child: ListView.builder(
-          itemCount: tankIds.length,
-          itemBuilder: (context, index) {
-            String currentTankId = tankIds[index];
-            return Column(
-              children: <Widget>[
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            FormCheckPage(tankId: currentTankId),
-                      ),
-                    );
-                  },
-                  child: Text('ถัง $currentTankId'),
-                ),
-                const SizedBox(height: 20),
-              ],
-            );
-          },
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'เลือกถัง',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            DropdownButton<String>(
+              hint: const Text("เลือกถัง"),
+              value: selectedTank,
+              items: tankIds.map((String tankId) {
+                int tankNumber =
+                    int.parse(tankId.replaceAll(RegExp(r'\D'), ''));
+                return DropdownMenuItem<String>(
+                  value: tankId,
+                  child: Text("ถัง $tankNumber"),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  selectedTank = newValue;
+                });
+                // เมื่อเลือกถังแล้วเปิดหน้า FormCheckPage พร้อม tankId
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FormCheckPage(tankId: newValue!),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -131,35 +147,6 @@ class FireTankDetailsPage extends StatelessWidget {
       ),
       body: Center(
         child: Text('FireTankDetailsID: $tankId'),
-      ),
-    );
-  }
-}
-
-class QRCodePage extends StatelessWidget {
-  const QRCodePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('QR Code Page'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            QrImageView(
-              data: 'https://fire-check-db.web.app',
-              version: QrVersions.auto,
-              size: 200.0,
-            ),
-            const SizedBox(height: 20),
-            const Text('QR Code for Tank 1'),
-            const SizedBox(height: 40),
-          ],
-        ),
       ),
     );
   }

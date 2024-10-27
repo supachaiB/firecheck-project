@@ -16,8 +16,9 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
       'floor': 'ชั้น 2',
       'date_checked': DateTime(2024, 10, 1),
       'inspector': 'นายสมชาย',
+      'user_type': 'ผู้ใช้ทั่วไป', // เพิ่มประเภทผู้ใช้
       'remarks': 'ปกติ',
-      'equipment_status': 'พร้อมใช้งาน'
+      'equipment_status': 'ตรวจสอบแล้ว'
     },
     {
       'tank_number': '002',
@@ -25,17 +26,19 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
       'floor': 'ชั้น 1',
       'date_checked': DateTime(2024, 9, 15),
       'inspector': 'นายวิชัย',
+      'user_type': 'ช่างเทคนิค', // เพิ่มประเภทผู้ใช้
       'remarks': 'พบการรั่วไหล',
       'equipment_status': 'ชำรุด'
     },
     {
       'tank_number': '003',
-      'building': 'หลวงปู่ขาว',
+      'building': 'หลวงปู่ขาว',
       'floor': 'ชั้น 1',
       'date_checked': DateTime(2024, 8, 10),
       'inspector': 'นางสาวสมฤดี',
-      'remarks': 'เปลี่ยนถังใหม่',
-      'equipment_status': 'หมดอายุ'
+      'user_type': 'ช่างเทคนิค', // เพิ่มประเภทผู้ใช้
+      'remarks': 'ส่งซ่อม',
+      'equipment_status': 'เปลี่ยนถัง'
     },
   ];
 
@@ -108,7 +111,7 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                               value: selectedBuilding,
                               isExpanded: true,
                               hint: const Text('เลือกอาคาร'),
-                              items: ['10 ชั้น', 'OPD', 'หลวงปู่ขาว']
+                              items: ['อาคาร 1', 'อาคาร 2', 'อาคาร 3']
                                   .map((building) {
                                 return DropdownMenuItem<String>(
                                   value: building,
@@ -148,8 +151,12 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                               value: selectedStatus,
                               isExpanded: true,
                               hint: const Text('สถานะการตรวจสอบ'),
-                              items: ['พร้อมใช้งาน', 'ชำรุด', 'ส่งซ่อม']
-                                  .map((status) {
+                              items: [
+                                'ตรวจสอบแล้ว',
+                                'ชำรุด',
+                                'ยังไมตรวจสอบ',
+                                'ส่งซ่อม'
+                              ].map((status) {
                                 return DropdownMenuItem<String>(
                                   value: status,
                                   child: Text(status),
@@ -203,44 +210,54 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                 ),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('หมายเลขถัง')),
-                      DataColumn(label: Text('อาคาร')),
-                      DataColumn(label: Text('ชั้น')),
-                      DataColumn(label: Text('วันที่ตรวจสอบ')),
-                      DataColumn(label: Text('ผู้ตรวจสอบ')),
-                      DataColumn(label: Text('ผลการตรวจสอบ')),
-                      DataColumn(label: Text('หมายเหตุ')),
-                    ],
-                    rows: filteredInspections.map((inspection) {
-                      String tankNumber =
-                          inspection['tank_number'] as String? ?? 'N/A';
-                      String building =
-                          inspection['building'] as String? ?? 'N/A';
-                      String floor = inspection['floor'] as String? ?? 'N/A';
-                      String dateChecked = inspection['date_checked'] != null
-                          ? (inspection['date_checked'] as DateTime)
-                              .toString()
-                              .substring(0, 10)
-                          : 'N/A';
-                      String inspector =
-                          inspection['inspector'] as String? ?? 'N/A';
-                      String equipmentStatus =
-                          inspection['equipment_status'] as String? ?? 'N/A';
-                      String remarks =
-                          inspection['remarks'] as String? ?? 'N/A';
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('หมายเลขถัง')),
+                        DataColumn(label: Text('อาคาร')),
+                        DataColumn(label: Text('ชั้น')),
+                        DataColumn(label: Text('วันที่ตรวจสอบ')),
+                        DataColumn(label: Text('ผู้ตรวจสอบ')),
+                        DataColumn(
+                            label: Text(
+                                'ประเภทผู้ใช้')), // เพิ่มคอลัมน์ประเภทผู้ใช้
+                        DataColumn(label: Text('ผลการตรวจสอบ')),
+                        DataColumn(label: Text('หมายเหตุ')),
+                      ],
+                      rows: filteredInspections.map((inspection) {
+                        String tankNumber =
+                            inspection['tank_number'] as String? ?? 'N/A';
+                        String building =
+                            inspection['building'] as String? ?? 'N/A';
+                        String floor = inspection['floor'] as String? ?? 'N/A';
+                        String dateChecked = inspection['date_checked'] != null
+                            ? (inspection['date_checked'] as DateTime)
+                                .toString()
+                                .substring(0, 10)
+                            : 'N/A';
+                        String inspector =
+                            inspection['inspector'] as String? ?? 'N/A';
+                        String userType = inspection['user_type'] as String? ??
+                            'N/A'; // เพิ่มประเภทผู้ใช้
+                        String equipmentStatus =
+                            inspection['equipment_status'] as String? ?? 'N/A';
+                        String remarks =
+                            inspection['remarks'] as String? ?? 'N/A';
 
-                      return DataRow(cells: [
-                        DataCell(Text(tankNumber)),
-                        DataCell(Text(building)),
-                        DataCell(Text(floor)),
-                        DataCell(Text(dateChecked)),
-                        DataCell(Text(inspector)),
-                        DataCell(Text(equipmentStatus)),
-                        DataCell(Text(remarks)),
-                      ]);
-                    }).toList(),
+                        return DataRow(cells: [
+                          DataCell(Text(tankNumber)),
+                          DataCell(Text(building)),
+                          DataCell(Text(floor)),
+                          DataCell(Text(dateChecked)),
+                          DataCell(Text(inspector)),
+                          DataCell(
+                              Text(userType)), // เพิ่มข้อมูลประเภทผู้ใช้ในแถว
+                          DataCell(Text(equipmentStatus)),
+                          DataCell(Text(remarks)),
+                        ]);
+                      }).toList(),
+                    ),
                   ),
                 ),
               ),
