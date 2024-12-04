@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:firecheck_setup/admin/dashboard_section/status_section.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -27,9 +28,7 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionTitle('สถานะรวมของถังดับเพลิง'),
-            const SizedBox(height: 10),
-            _buildContainerWithPadding(child: _buildStatusCards()),
+            StatusSection(), // ใช้ section ที่แยกออกมา
             const SizedBox(height: 20),
             _buildSectionTitle('ข้อมูลการชำรุด'),
             const SizedBox(height: 10),

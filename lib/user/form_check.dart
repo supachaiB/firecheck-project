@@ -4,8 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // สำหรับ Fir
 import 'firetank_details.dart'; // นำเข้าไฟล์ที่แสดงประวัติการตรวจสอบ
 
 class FormCheckPage extends StatefulWidget {
-  final String tankId; // เพิ่มพารามิเตอร์ ID ของถัง
+  //const FormCheckPage({Key? key}) : super(key: key);
 
+  final String tankId; // เพิ่มพารามิเตอร์ ID ของถัง
   const FormCheckPage({Key? key, required this.tankId}) : super(key: key);
 
   @override

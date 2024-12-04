@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:flutter_web_plugins/url_strategy.dart'; // นำเข้าหลังจากเพิ่ม url_strategy
+import 'package:flutter_web_plugins/url_strategy.dart';
 
+// นำเข้าหน้าต่าง ๆ ที่ต้องใช้
 import 'admin/inspection_history.dart';
 import 'admin/dashboard.dart';
 import 'admin/fire_tank_status.dart';
-import 'user/user.dart';
+import 'user/form_check.dart';
 import 'admin/Fire_tank_management.dart';
 import 'admin/qr_code.dart';
 
@@ -16,7 +17,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // ตั้งค่า Path-based Routing เพื่อเอา # ออก
+  // ใช้ PathUrlStrategy เพื่อให้ URL ไม่มีเครื่องหมาย #
   setUrlStrategy(PathUrlStrategy());
 
   runApp(const MyApp());
@@ -33,14 +34,48 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const DashboardPage(),
-      routes: {
-        // เพิ่ม route
-        '/firetankstatus': (context) => FireTankStatusPage(),
-        '/inspectionhistory': (context) => InspectionHistoryPage(),
-        '/user': (context) => UserPage(),
-        '/qr_code': (context) => QRCodePage(),
-        '/fire_tank_management': (context) => FireTankManagementPage(),
+      initialRoute: '/', // กำหนดเส้นทางเริ่มต้นเป็นหน้า Dashboard
+      onGenerateRoute: (RouteSettings settings) {
+        final uri = Uri.parse(settings.name ?? '/');
+
+        // ตรวจสอบเส้นทาง (Route) และ query parameters
+        if (uri.path == '/user') {
+          final tankId = uri.queryParameters['tankId'];
+          if (tankId == null) {
+            // กรณีไม่มี tankId ส่งกลับข้อความแสดงข้อผิดพลาด
+            return MaterialPageRoute(
+              builder: (context) => Scaffold(
+                appBar: AppBar(title: const Text('ข้อผิดพลาด')),
+                body: const Center(
+                  child: Text('Tank ID ไม่ถูกต้องหรือไม่ได้ระบุ.'),
+                ),
+              ),
+            );
+          }
+          // ส่ง tankId ไปยังหน้า FormCheckPage
+          return MaterialPageRoute(
+            builder: (context) => FormCheckPage(tankId: tankId),
+          );
+        }
+
+        // จัดการเส้นทางอื่น ๆ
+        switch (uri.path) {
+          case '/firetankstatus':
+            return MaterialPageRoute(
+                builder: (context) => FireTankStatusPage());
+          case '/inspectionhistory':
+            return MaterialPageRoute(
+                builder: (context) => InspectionHistoryPage());
+          case '/qr_code':
+            return MaterialPageRoute(builder: (context) => QRCodePage());
+          case '/fire_tank_management':
+            return MaterialPageRoute(
+                builder: (context) => FireTankManagementPage());
+          default:
+            // เส้นทางเริ่มต้น
+            return MaterialPageRoute(
+                builder: (context) => const DashboardPage());
+        }
       },
     );
   }
