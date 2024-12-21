@@ -6,30 +6,44 @@ class FireTankStatusPage extends StatefulWidget {
 }
 
 class _FireTankStatusPageState extends State<FireTankStatusPage> {
-  // ข้อมูลจำลอง
-  final List<Map<String, dynamic>> buildings =
-      List.generate(14, (buildingIndex) {
-    return {
-      "building": "Building ${buildingIndex + 1}",
-      "floors": List.generate(15, (floorIndex) {
-        return {
-          "floor": "Floor ${floorIndex + 1}",
-          "tanks": List.generate(3, (tankIndex) {
-            return {
-              "tankNumber":
-                  "${buildingIndex + 1}-${floorIndex + 1}-${tankIndex + 1}",
-              "status": (tankIndex % 3 == 0)
-                  ? "พร้อมใช้งาน"
-                  : (tankIndex % 3 == 1)
-                      ? "ส่งซ่อม"
-                      : "ยังไม่ตรวจสอบ",
-              "lastChecked": "2024-10-${(tankIndex + 1) * 2}",
-            };
-          })
-        };
-      })
-    };
-  });
+  // ข้อมูลจำลอง (สร้างด้วย Loop)
+  final List<Map<String, dynamic>> buildings = [
+    for (var building in [
+      "10 ชั้น",
+      "หลวงปู่ขาว",
+      "OPD",
+      "114 เตียง",
+      "NSU",
+      "60 เตียง",
+      "เมตตา",
+      "โภชนาศาสตร์",
+      "จิตเวช",
+      "กายภาพ&ธนาคารเลือด",
+      "พัฒนากระตุ้นเด็ก",
+      "จ่ายกลาง",
+      "ซักฟอก",
+      "ผลิตงาน & โรงงานช่าง"
+    ])
+      {
+        "building": building,
+        "floors": List.generate(10, (floorIndex) {
+          return {
+            "floor": "ชั้น ${floorIndex + 1}",
+            "tanks": List.generate(3, (tankIndex) {
+              return {
+                "tankNumber": "${building}-${floorIndex + 1}-${tankIndex + 1}",
+                "status": (tankIndex % 3 == 0)
+                    ? "ตรวจสอบแล้ว"
+                    : (tankIndex % 3 == 1)
+                        ? "ส่งซ่อม"
+                        : "ยังไม่ตรวจสอบ",
+                "lastChecked": "2024-10-${(tankIndex + 1) * 2}",
+              };
+            }),
+          };
+        }),
+      }
+  ];
 
   String? selectedBuilding;
   String? selectedFloor;
@@ -69,17 +83,18 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
 
   // ฟังก์ชันสร้างกล่องสรุปภาพรวมสถานะ
   Widget _buildStatusSummaryBox() {
-    int readyCount = 0;
-    int repairCount = 0;
+    int checkedCount = 0;
+    int notCheckedCount = 0;
     int brokenCount = 0;
+    int repairCount = 0;
 
     for (var building in buildings) {
       for (var floor in building['floors']) {
         for (var tank in floor['tanks']) {
-          if (tank['status'] == 'พร้อมใช้งาน') readyCount++;
-          if (tank['status'] == 'ส่งซ่อม') repairCount++;
+          if (tank['status'] == 'ตรวจสอบแล้ว') checkedCount++;
+          if (tank['status'] == 'ยังไม่ตรวจสอบ') notCheckedCount++;
           if (tank['status'] == 'ชำรุด') brokenCount++;
-          if (tank['status'] == 'ยังไม่ตรวจสอบ') brokenCount++;
+          if (tank['status'] == 'ส่งซ่อม') repairCount++;
         }
       }
     }
@@ -92,10 +107,14 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildSummaryCard("พร้อมใช้งาน", readyCount, Colors.green),
-            _buildSummaryCard("ส่งซ่อม", repairCount, Colors.orange),
+            _buildSummaryCard(
+                "ถังทั้งหมด",
+                checkedCount + notCheckedCount + brokenCount + repairCount,
+                Colors.blue),
+            _buildSummaryCard("ตรวจสอบแล้ว", checkedCount, Colors.green),
+            _buildSummaryCard("ยังไม่ตรวจสอบ", notCheckedCount, Colors.grey),
             _buildSummaryCard("ชำรุด", brokenCount, Colors.red),
-            _buildSummaryCard("ยังไม่ตรวจสอบ", brokenCount, Colors.grey),
+            _buildSummaryCard("ส่งซ่อม", repairCount, Colors.orange),
           ],
         ),
       ),
@@ -193,7 +212,7 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
                     value: selectedStatus,
                     hint: Text("กรองตามสถานะ"),
                     isExpanded: true,
-                    items: ['พร้อมใช้งาน', 'ส่งซ่อม', 'ชำรุด', 'ยังไม่ตรวจสอบ']
+                    items: ['ตรวจสอบแล้ว', 'ยังไม่ตรวจสอบ', 'ชำรุด', 'ส่งซ่อม']
                         .map((status) {
                       return DropdownMenuItem<String>(
                         value: status,
@@ -208,7 +227,6 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
                     },
                   ),
                 ),
-
                 SizedBox(width: 10),
 
                 // ตัวกรองวันที่ตรวจสอบล่าสุด
@@ -287,7 +305,7 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
   // ฟังก์ชันกำหนดสีของจุดตามสถานะ
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'พร้อมใช้งาน':
+      case 'ตรวจสอบแล้ว':
         return Colors.green;
       case 'ส่งซ่อม':
         return Colors.orange;
@@ -336,7 +354,7 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
             value: updatedStatus,
             hint: Text("เลือกสถานะใหม่"),
             isExpanded: true,
-            items: ['พร้อมใช้งาน', 'ส่งซ่อม', 'ชำรุด', 'ยังไม่ตรวจสอบ']
+            items: ['ตรวจสอบแล้ว', 'ยังไม่ตรวจสอบ', 'ชำรุด', 'ส่งซ่อม']
                 .map((status) {
               return DropdownMenuItem<String>(
                 value: status,

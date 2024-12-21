@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class InspectionHistoryPage extends StatefulWidget {
   const InspectionHistoryPage({super.key});
@@ -8,40 +9,6 @@ class InspectionHistoryPage extends StatefulWidget {
 }
 
 class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
-  // ข้อมูลจำลอง (mock data)
-  final List<Map<String, dynamic>> inspections = [
-    {
-      'tank_number': '001',
-      'building': 'OPD',
-      'floor': 'ชั้น 2',
-      'date_checked': DateTime(2024, 10, 1),
-      'inspector': 'นายสมชาย',
-      'user_type': 'ผู้ใช้ทั่วไป', // เพิ่มประเภทผู้ใช้
-      'remarks': 'ปกติ',
-      'equipment_status': 'ตรวจสอบแล้ว'
-    },
-    {
-      'tank_number': '002',
-      'building': '10 ชั้น',
-      'floor': 'ชั้น 1',
-      'date_checked': DateTime(2024, 9, 15),
-      'inspector': 'นายวิชัย',
-      'user_type': 'ช่างเทคนิค', // เพิ่มประเภทผู้ใช้
-      'remarks': 'พบการรั่วไหล',
-      'equipment_status': 'ชำรุด'
-    },
-    {
-      'tank_number': '003',
-      'building': 'หลวงปู่ขาว',
-      'floor': 'ชั้น 1',
-      'date_checked': DateTime(2024, 8, 10),
-      'inspector': 'นางสาวสมฤดี',
-      'user_type': 'ช่างเทคนิค', // เพิ่มประเภทผู้ใช้
-      'remarks': 'ส่งซ่อม',
-      'equipment_status': 'เปลี่ยนถัง'
-    },
-  ];
-
   String? selectedBuilding;
   String? selectedFloor;
   String? selectedStatus;
@@ -49,32 +16,6 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    // ฟิลเตอร์ข้อมูลตามตัวเลือก
-    List<Map<String, dynamic>> filteredInspections =
-        inspections.where((inspection) {
-      if (selectedBuilding != null &&
-          inspection['building'] != selectedBuilding) {
-        return false;
-      }
-      if (selectedFloor != null && inspection['floor'] != selectedFloor) {
-        return false;
-      }
-      if (selectedStatus != null &&
-          inspection['equipment_status'] != selectedStatus) {
-        return false;
-      }
-      return true;
-    }).toList();
-
-    // จัดเรียงข้อมูลตามตัวเลือก
-    if (sortBy == 'date') {
-      filteredInspections.sort((a, b) => (b['date_checked'] as DateTime)
-          .compareTo(a['date_checked'] as DateTime));
-    } else if (sortBy == 'tank_number') {
-      filteredInspections
-          .sort((a, b) => a['tank_number'].compareTo(b['tank_number']));
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('ประวัติการตรวจสอบ'),
@@ -85,7 +26,7 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ฟิลเตอร์และการจัดเรียง
+              // ส่วนตัวกรอง
               Card(
                 margin: const EdgeInsets.only(bottom: 20),
                 elevation: 3,
@@ -111,8 +52,7 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                               value: selectedBuilding,
                               isExpanded: true,
                               hint: const Text('เลือกอาคาร'),
-                              items: ['อาคาร 1', 'อาคาร 2', 'อาคาร 3']
-                                  .map((building) {
+                              items: ['10 ชั้น', 'หลวงปู่ขาว'].map((building) {
                                 return DropdownMenuItem<String>(
                                   value: building,
                                   child: Text(building),
@@ -131,11 +71,10 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                               value: selectedFloor,
                               isExpanded: true,
                               hint: const Text('เลือกชั้น'),
-                              items:
-                                  ['ชั้น 1', 'ชั้น 2', 'ชั้น 3'].map((floor) {
+                              items: ['1', '2', '3'].map((building) {
                                 return DropdownMenuItem<String>(
-                                  value: floor,
-                                  child: Text(floor),
+                                  value: building.toString(),
+                                  child: Text(building.toString()),
                                 );
                               }).toList(),
                               onChanged: (value) {
@@ -145,17 +84,22 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                               },
                             ),
                           ),
-                          const SizedBox(width: 10),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
                           Expanded(
                             child: DropdownButton<String>(
                               value: selectedStatus,
                               isExpanded: true,
-                              hint: const Text('สถานะการตรวจสอบ'),
+                              hint: const Text('เลือกสถานะการตรวจสอบ'),
                               items: [
                                 'ตรวจสอบแล้ว',
+                                'ส่งซ่อม',
                                 'ชำรุด',
-                                'ยังไมตรวจสอบ',
-                                'ส่งซ่อม'
+                                'ยังไม่ตรวจสอบ'
                               ].map((status) {
                                 return DropdownMenuItem<String>(
                                   value: status,
@@ -169,9 +113,9 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                               },
                             ),
                           ),
+                          const SizedBox(width: 10),
                         ],
                       ),
-                      const SizedBox(height: 10),
                       Row(
                         children: [
                           const Text('เรียงตาม: '),
@@ -202,64 +146,157 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                 ),
               ),
 
-              // ตารางข้อมูลประวัติการตรวจสอบ
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.vertical,
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('หมายเลขถัง')),
-                        DataColumn(label: Text('อาคาร')),
-                        DataColumn(label: Text('ชั้น')),
-                        DataColumn(label: Text('วันที่ตรวจสอบ')),
-                        DataColumn(label: Text('ผู้ตรวจสอบ')),
-                        DataColumn(
-                            label: Text(
-                                'ประเภทผู้ใช้')), // เพิ่มคอลัมน์ประเภทผู้ใช้
-                        DataColumn(label: Text('ผลการตรวจสอบ')),
-                        DataColumn(label: Text('หมายเหตุ')),
-                      ],
-                      rows: filteredInspections.map((inspection) {
-                        String tankNumber =
-                            inspection['tank_number'] as String? ?? 'N/A';
-                        String building =
-                            inspection['building'] as String? ?? 'N/A';
-                        String floor = inspection['floor'] as String? ?? 'N/A';
-                        String dateChecked = inspection['date_checked'] != null
-                            ? (inspection['date_checked'] as DateTime)
-                                .toString()
-                                .substring(0, 10)
-                            : 'N/A';
-                        String inspector =
-                            inspection['inspector'] as String? ?? 'N/A';
-                        String userType = inspection['user_type'] as String? ??
-                            'N/A'; // เพิ่มประเภทผู้ใช้
-                        String equipmentStatus =
-                            inspection['equipment_status'] as String? ?? 'N/A';
-                        String remarks =
-                            inspection['remarks'] as String? ?? 'N/A';
+              // ส่วนแสดงข้อมูล
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('firetank_Collection')
+                    .snapshots(),
+                builder: (context, firetankSnapshot) {
+                  if (firetankSnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                        return DataRow(cells: [
-                          DataCell(Text(tankNumber)),
-                          DataCell(Text(building)),
-                          DataCell(Text(floor)),
-                          DataCell(Text(dateChecked)),
-                          DataCell(Text(inspector)),
-                          DataCell(
-                              Text(userType)), // เพิ่มข้อมูลประเภทผู้ใช้ในแถว
-                          DataCell(Text(equipmentStatus)),
-                          DataCell(Text(remarks)),
-                        ]);
-                      }).toList(),
-                    ),
-                  ),
-                ),
+                  if (!firetankSnapshot.hasData ||
+                      firetankSnapshot.data!.docs.isEmpty) {
+                    return const Center(
+                        child: Text('ไม่มีข้อมูลใน Firetank Collection'));
+                  }
+
+                  List<Map<String, dynamic>> firetankData = firetankSnapshot
+                      .data!.docs
+                      .map((doc) => doc.data() as Map<String, dynamic>)
+                      .toList();
+
+                  // ดึงข้อมูลจาก form_checks
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('form_checks')
+                        .snapshots(),
+                    builder: (context, formChecksSnapshot) {
+                      if (formChecksSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      if (!formChecksSnapshot.hasData ||
+                          formChecksSnapshot.data!.docs.isEmpty) {
+                        return const Center(
+                            child: Text('ไม่มีข้อมูลใน Form Checks'));
+                      }
+
+                      List<Map<String, dynamic>> formChecksData =
+                          formChecksSnapshot.data!.docs
+                              .map((doc) => doc.data() as Map<String, dynamic>)
+                              .toList();
+
+                      // รวมข้อมูลจากทั้งสอง collection
+                      List<Map<String, dynamic>> combinedData =
+                          firetankData.map((firetank) {
+                        String tankId = firetank['tank_id'] ?? 'N/A';
+
+                        // หา form_check ที่ตรงกับ tank_id
+                        var formCheck = formChecksData.firstWhere(
+                            (check) => check['tank_id'] == tankId,
+                            orElse: () => {
+                                  'date_checked': 'N/A',
+                                  'inspector': 'N/A',
+                                  'user_type': 'N/A',
+                                  'equipment_status': 'N/A',
+                                  'remarks': 'N/A'
+                                });
+
+                        return {
+                          'tank_id': tankId,
+                          'building': firetank['building'] ?? 'N/A',
+                          'floor': firetank['floor'] ?? 'N/A',
+                          'date_checked': formCheck['date_checked'] ?? 'N/A',
+                          'inspector': formCheck['inspector'] ?? 'N/A',
+                          'user_type': formCheck['user_type'] ?? 'N/A',
+                          'equipment_status':
+                              formCheck['equipment_status'] ?? 'N/A',
+                          'remarks': formCheck['remarks'] ?? 'N/A',
+                        };
+                      }).toList();
+
+                      // กรองข้อมูลตามตัวเลือก
+                      if (selectedBuilding != null &&
+                          selectedBuilding!.isNotEmpty) {
+                        combinedData = combinedData.where((inspection) {
+                          return inspection['building'] == selectedBuilding;
+                        }).toList();
+                      }
+                      if (selectedFloor != null && selectedFloor!.isNotEmpty) {
+                        combinedData = combinedData.where((inspection) {
+                          return inspection['floor'] == selectedFloor;
+                        }).toList();
+                      }
+                      if (selectedStatus != null &&
+                          selectedStatus!.isNotEmpty) {
+                        combinedData = combinedData.where((inspection) {
+                          return inspection['equipment_status'] ==
+                              selectedStatus;
+                        }).toList();
+                      }
+
+                      // การจัดเรียงข้อมูล
+                      if (sortBy == 'date') {
+                        combinedData.sort((a, b) {
+                          DateTime? dateA = a['date_checked'] is Timestamp
+                              ? (a['date_checked'] as Timestamp).toDate()
+                              : DateTime.tryParse(a['date_checked']);
+                          DateTime? dateB = b['date_checked'] is Timestamp
+                              ? (b['date_checked'] as Timestamp).toDate()
+                              : DateTime.tryParse(b['date_checked']);
+                          return dateB!.compareTo(dateA!); // ล่าสุดก่อน
+                        });
+                      } else if (sortBy == 'tank_number') {
+                        combinedData.sort((a, b) {
+                          return a['tank_id'].compareTo(b['tank_id']);
+                        });
+                      }
+
+                      return DataTable(
+                        columns: const [
+                          DataColumn(label: Text('หมายเลขถัง')),
+                          DataColumn(label: Text('อาคาร')),
+                          DataColumn(label: Text('ชั้น')),
+                          DataColumn(label: Text('วันที่ตรวจสอบ')),
+                          DataColumn(label: Text('ผู้ตรวจสอบ')),
+                          DataColumn(label: Text('ประเภทผู้ใช้')),
+                          DataColumn(label: Text('ผลการตรวจสอบ')),
+                          DataColumn(label: Text('หมายเหตุ')),
+                        ],
+                        rows: combinedData.map((inspection) {
+                          return DataRow(cells: [
+                            DataCell(Text(inspection['tank_id']?.toString() ??
+                                'N/A')), // ใช้ .toString()
+                            DataCell(Text(
+                                inspection['building']?.toString() ?? 'N/A')),
+                            DataCell(
+                                Text(inspection['floor']?.toString() ?? 'N/A')),
+                            DataCell(Text(
+                                inspection['date_checked'] is Timestamp
+                                    ? (inspection['date_checked'] as Timestamp)
+                                        .toDate()
+                                        .toString()
+                                    : inspection['date_checked']?.toString() ??
+                                        'N/A')),
+                            DataCell(Text(
+                                inspection['inspector']?.toString() ?? 'N/A')),
+                            DataCell(Text(
+                                inspection['user_type']?.toString() ?? 'N/A')),
+                            DataCell(Text(
+                                inspection['equipment_status']?.toString() ??
+                                    'N/A')),
+                            DataCell(Text(
+                                inspection['remarks']?.toString() ?? 'N/A')),
+                          ]);
+                        }).toList(),
+                      );
+                    },
+                  );
+                },
               ),
             ],
           ),
