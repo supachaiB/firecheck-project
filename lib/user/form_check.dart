@@ -4,9 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // สำหรับ Fir
 import 'firetank_details.dart'; // นำเข้าไฟล์ที่แสดงประวัติการตรวจสอบ
 
 class FormCheckPage extends StatefulWidget {
-  //const FormCheckPage({Key? key}) : super(key: key);
+  final String tankId;
 
-  final String tankId; // เพิ่มพารามิเตอร์ ID ของถัง
   const FormCheckPage({Key? key, required this.tankId}) : super(key: key);
 
   @override
@@ -15,6 +14,7 @@ class FormCheckPage extends StatefulWidget {
 
 class _FormCheckPageState extends State<FormCheckPage> {
   final TextEditingController _dateController = TextEditingController();
+  final TextEditingController _timeController = TextEditingController();
   final Map<String, String> equipmentStatus = {
     'สายวัด': 'ปกติ',
     'คันบังคับ': 'ปกติ',
@@ -23,17 +23,56 @@ class _FormCheckPageState extends State<FormCheckPage> {
   };
   final TextEditingController _remarkController = TextEditingController();
   final TextEditingController _inspectorController = TextEditingController();
-  List<String> staffList = []; // ตัวอย่างรายชื่อพนักงาน
-  List<String> filteredStaffList = []; // รายชื่อพนักงานที่ตรงกัน
-  String? selectedStaff; // ชื่อพนักงานที่ถูกเลือก
-  String? userType; // ประเภทผู้ใช้ที่เลือก
+  List<String> staffList = [];
+  List<String> filteredStaffList = [];
+  String? selectedStaff;
+  String? userType;
+  String? latestCheckDate; // สำหรับวันที่ตรวจสอบล่าสุด
+  String? latestCheckTime; // สำหรับเวลา
 
   @override
   void initState() {
     super.initState();
-    filteredStaffList = staffList; // แสดงรายชื่อพนักงานเริ่มต้น
-    _dateController.text =
-        DateFormat('yyyy-MM-dd').format(DateTime.now()); // วันที่ปัจจุบัน
+    filteredStaffList = staffList;
+    _dateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    _timeController.text =
+        DateFormat('HH:mm').format(DateTime.now()); // เวลาปัจจุบัน
+    fetchLatestCheckDate(); // ดึงข้อมูลวันที่ล่าสุด
+  }
+
+  Future<void> fetchLatestCheckDate() async {
+    CollectionReference formChecks =
+        FirebaseFirestore.instance.collection('form_checks');
+
+    try {
+      QuerySnapshot querySnapshot = await formChecks
+          .where('tank_id', isEqualTo: widget.tankId)
+          .orderBy('date_checked', descending: true)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        // ดึงข้อมูลวันที่ตรวจสอบล่าสุดที่เป็น String
+        String dateString = querySnapshot.docs.first['date_checked'];
+        String timeString = querySnapshot.docs.first['time_checked'];
+
+        setState(() {
+          latestCheckDate = dateString; // วันที่
+          latestCheckTime = timeString; // เวลา
+        });
+      } else {
+        setState(() {
+          latestCheckDate = 'ไม่มีข้อมูล';
+          latestCheckTime = '';
+        });
+      }
+    } catch (e) {
+      print("Error fetching latest check date: $e");
+      setState(() {
+        latestCheckDate = 'เกิดข้อผิดพลาด';
+        latestCheckTime = '';
+      });
+    }
   }
 
   void _filterStaff(String query) {
@@ -45,58 +84,86 @@ class _FormCheckPageState extends State<FormCheckPage> {
   }
 
   Future<void> saveDataToFirestore() async {
+    // ตรวจสอบว่า date_checked, time_checked, equipment_status และ user_type ได้รับการกรอกหรือเลือก
+    if (_dateController.text.isEmpty ||
+        _timeController.text.isEmpty ||
+        equipmentStatus.values.any((status) => status.isEmpty) ||
+        userType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
+      );
+      return; // หยุดการบันทึกข้อมูลถ้าข้อมูลไม่ครบ
+    }
+
     CollectionReference formChecks =
         FirebaseFirestore.instance.collection('form_checks');
 
-    // สร้าง ID เอกสารโดยใช้วันที่และชื่อผู้ตรวจสอบ
     String docId =
         '${_dateController.text}_${widget.tankId}_${_inspectorController.text}';
 
-    await formChecks.doc(docId).set({
-      'date_checked': _dateController.text,
-      'inspector': selectedStaff ?? _inspectorController.text,
-      'user_type': userType, // บันทึกประเภทผู้ใช้
-      'equipment_status': equipmentStatus,
-      'remarks': _remarkController.text,
-      'tank_id': widget.tankId, // บันทึก ID ถัง
-    }).then((value) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('บันทึกข้อมูลเรียบร้อยแล้ว')),
-      );
-    }).catchError((error) {
+    try {
+      await formChecks.doc(docId).set({
+        'date_checked': _dateController.text,
+        'time_checked': _timeController.text, // บันทึกเวลา
+        'inspector': selectedStaff ?? _inspectorController.text,
+        'user_type': userType,
+        'equipment_status': equipmentStatus,
+        'remarks': _remarkController.text,
+        'tank_id': widget.tankId,
+      }).then((value) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('บันทึกข้อมูลเรียบร้อยแล้ว')),
+        );
+      });
+    } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('เกิดข้อผิดพลาด: $error')),
       );
-    });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final double fontSize = 16; // กำหนดฟอนต์แบบคงที่
+    final EdgeInsets padding = const EdgeInsets.symmetric(vertical: 8.0);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Form Check'),
+        title: Text(
+          'Form Check',
+          style: TextStyle(fontSize: fontSize * 1.2),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            // กล่องแรก - วันที่ตรวจสอบล่าสุด, สถานะ, ดูทั้งหมด
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('วันที่ตรวจสอบล่าสุด: 2024-10-04 เวลา 09:00'),
+                    Text(
+                      'วันที่ตรวจสอบล่าสุด: ${latestCheckDate ?? 'กำลังโหลด...'} ${latestCheckTime ?? ''}',
+                      style: TextStyle(fontSize: fontSize),
+                    ),
+                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
-                          children: const [
-                            Text('สถานะ: '),
+                          children: [
+                            Text(
+                              'สถานะ: ',
+                              style: TextStyle(fontSize: fontSize),
+                            ),
                             Icon(Icons.circle, color: Colors.green, size: 12),
                             SizedBox(width: 8),
-                            Text('ตรวจสอบแล้ว'),
+                            Text(
+                              'ตรวจสอบแล้ว',
+                              style: TextStyle(fontSize: fontSize),
+                            ),
                           ],
                         ),
                         TextButton(
@@ -105,12 +172,15 @@ class _FormCheckPageState extends State<FormCheckPage> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => FireTankDetailsPage(
-                                    tankId: widget
-                                        .tankId), // ส่ง tankId ไปหน้า FireTankDetailsPage
+                                  tankId: widget.tankId,
+                                ),
                               ),
                             );
                           },
-                          child: const Text('ดูทั้งหมด'),
+                          child: Text(
+                            'ดูทั้งหมด',
+                            style: TextStyle(fontSize: fontSize),
+                          ),
                         ),
                       ],
                     ),
@@ -118,13 +188,11 @@ class _FormCheckPageState extends State<FormCheckPage> {
                 ),
               ),
             ),
-
-            const SizedBox(height: 20),
-
-            // เพิ่มการแสดง Tank ID
-            Text('Tank ID: ${widget.tankId}'), // แสดง Tank ID ที่รับมา
-
-            // กล่องสอง - กรอกวันที่, รายการตรวจสอบ
+            SizedBox(height: 20),
+            Text(
+              'Tank ID: ${widget.tankId}',
+              style: TextStyle(fontSize: fontSize),
+            ),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -135,17 +203,36 @@ class _FormCheckPageState extends State<FormCheckPage> {
                       controller: _dateController,
                       decoration: InputDecoration(
                         labelText: 'วันที่ตรวจสอบ',
+                        labelStyle: TextStyle(fontSize: fontSize),
                       ),
                       readOnly: true,
+                      style: TextStyle(fontSize: fontSize),
+                    ),
+                    TextField(
+                      controller: _timeController,
+                      decoration: InputDecoration(
+                        labelText: 'เวลา',
+                        labelStyle: TextStyle(fontSize: fontSize),
+                      ),
+                      readOnly: true,
+                      style: TextStyle(fontSize: fontSize),
                     ),
                     const SizedBox(height: 20),
-                    const Text('รายการตรวจสอบ'),
+                    Text(
+                      'รายการตรวจสอบ',
+                      style: TextStyle(fontSize: fontSize),
+                    ),
                     Column(
                       children: equipmentStatus.keys.map((String key) {
-                        return ListTile(
-                          title: Text(key),
-                          subtitle: Row(
+                        return Padding(
+                          padding: padding,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
+                              Text(
+                                key,
+                                style: TextStyle(fontSize: fontSize),
+                              ),
                               Row(
                                 children: [
                                   Checkbox(
@@ -157,11 +244,10 @@ class _FormCheckPageState extends State<FormCheckPage> {
                                       });
                                     },
                                   ),
-                                  const Text('ปกติ'),
-                                ],
-                              ),
-                              Row(
-                                children: [
+                                  Text(
+                                    'ปกติ',
+                                    style: TextStyle(fontSize: fontSize),
+                                  ),
                                   Checkbox(
                                     value: equipmentStatus[key] == 'ชำรุด',
                                     onChanged: (bool? value) {
@@ -171,7 +257,10 @@ class _FormCheckPageState extends State<FormCheckPage> {
                                       });
                                     },
                                   ),
-                                  const Text('ชำรุด'),
+                                  Text(
+                                    'ชำรุด',
+                                    style: TextStyle(fontSize: fontSize),
+                                  ),
                                 ],
                               ),
                             ],
@@ -180,11 +269,14 @@ class _FormCheckPageState extends State<FormCheckPage> {
                       }).toList(),
                     ),
                     const SizedBox(height: 20),
-                    const Text('ผู้ตรวจสอบ'),
                     TextField(
                       controller: _inspectorController,
                       onChanged: _filterStaff,
-                      decoration: const InputDecoration(),
+                      decoration: InputDecoration(
+                        hintText: 'ผู้ตรวจสอบ',
+                        hintStyle: TextStyle(fontSize: fontSize),
+                      ),
+                      style: TextStyle(fontSize: fontSize),
                     ),
                     if (filteredStaffList.isNotEmpty)
                       Container(
@@ -193,7 +285,10 @@ class _FormCheckPageState extends State<FormCheckPage> {
                           itemCount: filteredStaffList.length,
                           itemBuilder: (context, index) {
                             return ListTile(
-                              title: Text(filteredStaffList[index]),
+                              title: Text(
+                                filteredStaffList[index],
+                                style: TextStyle(fontSize: fontSize),
+                              ),
                               onTap: () {
                                 setState(() {
                                   selectedStaff = filteredStaffList[index];
@@ -206,19 +301,26 @@ class _FormCheckPageState extends State<FormCheckPage> {
                         ),
                       ),
                     const SizedBox(height: 20),
-
-                    // ประเภทผู้ใช้ dropdown
-                    const Text('ประเภทผู้ใช้'),
+                    Text(
+                      'ประเภทผู้ใช้',
+                      style: TextStyle(fontSize: fontSize),
+                    ),
                     DropdownButton<String>(
                       value: userType,
                       items: [
                         DropdownMenuItem(
                           value: 'ผู้ใช้ทั่วไป',
-                          child: Text('ผู้ใช้ทั่วไป'),
+                          child: Text(
+                            'ผู้ใช้ทั่วไป',
+                            style: TextStyle(fontSize: fontSize),
+                          ),
                         ),
                         DropdownMenuItem(
                           value: 'ช่างเทคนิค',
-                          child: Text('ช่างเทคนิค'),
+                          child: Text(
+                            'ช่างเทคนิค',
+                            style: TextStyle(fontSize: fontSize),
+                          ),
                         ),
                       ],
                       onChanged: (String? newValue) {
@@ -226,36 +328,36 @@ class _FormCheckPageState extends State<FormCheckPage> {
                           userType = newValue;
                         });
                       },
-                      hint: const Text('เลือกประเภทผู้ใช้'),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // ปุ่มถ่ายภาพ
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        // Placeholder for future photo capture functionality
-                      },
-                      icon: const Icon(Icons.camera_alt),
-                      label: const Text('ถ่ายภาพ'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white, // Updated parameter name
+                      hint: Text(
+                        'เลือกประเภทผู้ใช้',
+                        style: TextStyle(fontSize: fontSize),
                       ),
                     ),
-
+                    const SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.camera_alt),
+                      label: Text(
+                        'ถ่ายภาพ',
+                        style: TextStyle(fontSize: fontSize),
+                      ),
+                    ),
                     const SizedBox(height: 20),
                     TextField(
                       controller: _remarkController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'หมายเหตุ',
+                        labelStyle: TextStyle(fontSize: fontSize),
                       ),
+                      style: TextStyle(fontSize: fontSize),
                     ),
                     const SizedBox(height: 20),
                     ElevatedButton(
-                      onPressed: () {
-                        saveDataToFirestore();
-                      },
-                      child: const Text('บันทึก'),
+                      onPressed: saveDataToFirestore,
+                      child: Text(
+                        'บันทึก',
+                        style: TextStyle(fontSize: fontSize),
+                      ),
                     ),
                   ],
                 ),

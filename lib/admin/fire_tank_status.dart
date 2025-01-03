@@ -49,7 +49,7 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
   String? selectedFloor;
   String? selectedStatus;
   String? selectedDate;
-  List<Map<String, String>> filteredTanks = [];
+  List<Map<String, dynamic>> filteredTanks = [];
 
   @override
   Widget build(BuildContext context) {
@@ -325,7 +325,8 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
           (building) => building["building"] == selectedBuilding)["floors"];
       filteredTanks = floors
           .firstWhere((floor) => floor["floor"] == selectedFloor)["tanks"]
-          .cast<Map<String, String>>();
+          .cast<
+              Map<String, dynamic>>(); // เปลี่ยน cast เป็น Map<String, dynamic>
 
       if (selectedStatus != null) {
         filteredTanks = filteredTanks
@@ -342,8 +343,8 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
   }
 
   // ฟังก์ชันแสดง Dialog สำหรับอัปเดตสถานะถัง
-  void _showUpdateStatusDialog(Map<String, String> tank) {
-    String? updatedStatus;
+  void _showUpdateStatusDialog(Map<String, dynamic> tank) {
+    String? updatedStatus = tank['status'];
 
     showDialog(
       context: context,
@@ -371,7 +372,7 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
             TextButton(
               onPressed: () {
                 setState(() {
-                  tank['status'] = updatedStatus ?? tank['status']!;
+                  tank['status'] = updatedStatus ?? tank['status'];
                 });
                 Navigator.of(context).pop();
               },
