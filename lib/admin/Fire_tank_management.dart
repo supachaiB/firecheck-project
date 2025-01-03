@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class FireTankManagementPage extends StatefulWidget {
   const FireTankManagementPage({Key? key}) : super(key: key);
@@ -422,10 +423,19 @@ class _FireTankFormPageState extends State<FireTankFormPage> {
     return nextId;
   }
 
+  Future<void> _generateQRCode(String tankId) async {
+    // ใช้ tankId เป็นข้อมูลในการสร้าง QR Code
+    _qrCode =
+        'https://fire-check-db.web.app/user?tankId=$tankId'; // URL หรือข้อมูลที่ต้องการสร้าง QR
+  }
+
   // ฟังก์ชันบันทึกข้อมูล
   Future<void> _saveFireTankData() async {
     try {
       final newId = _fireExtinguisherIdController.text;
+
+      // สร้าง QR Code
+      await _generateQRCode(newId); // << เพิ่มตรงนี้
 
       if (widget.editTank == null) {
         // เพิ่มข้อมูลใหม่
@@ -436,7 +446,7 @@ class _FireTankFormPageState extends State<FireTankFormPage> {
           'floor': _floor,
           'status': 'ตรวจสอบแล้ว',
           'installation_date': _installationDate, // บันทึกวันที่ติดตั้ง
-          'qrcode': _qrCode,
+          'qrcode': _qrCode, // << เพิ่มตรงนี้
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('บันทึกข้อมูลสำเร็จ')),
@@ -453,7 +463,7 @@ class _FireTankFormPageState extends State<FireTankFormPage> {
           'floor': _floor,
           'status': 'ตรวจสอบแล้ว',
           'installation_date': _installationDate, // อัปเดตวันที่ติดตั้ง
-          'qrcode': _qrCode,
+          'qrcode': _qrCode, // << เพิ่มตรงนี้
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('แก้ไขข้อมูลสำเร็จ')),
@@ -657,14 +667,14 @@ class FireTankDetailPage extends StatelessWidget {
             Text('วันที่ติดตั้ง: $formattedDate'),
 
             // แสดง QR Code
-            /*if (tank['qr_code_url'] != null)
+            if (tank['qrcode'] != null)
               Center(
-                child: Image.network(
-                  tank['qr_code_url'],
-                  height: 200,
-                  fit: BoxFit.cover,
+                child: QrImageView(
+                  data: tank['qrcode'], // ใช้ข้อมูล qrcode จาก Firestore
+                  size: 200.0,
                 ),
-              ),*/
+              ),
+
             const Spacer(),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
