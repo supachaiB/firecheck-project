@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart'; // สำหรับเปิด URL
 
 class FireTankManagementPage extends StatefulWidget {
   const FireTankManagementPage({Key? key}) : super(key: key);
@@ -666,13 +667,42 @@ class FireTankDetailPage extends StatelessWidget {
             // แสดงวันที่ติดตั้ง
             Text('วันที่ติดตั้ง: $formattedDate'),
 
-            // แสดง QR Code
+            // แสดง QR Code และลิงก์ที่คลิกได้
             if (tank['qrcode'] != null)
-              Center(
-                child: QrImageView(
-                  data: tank['qrcode'], // ใช้ข้อมูล qrcode จาก Firestore
-                  size: 200.0,
-                ),
+              Column(
+                children: [
+                  // QR Code Image
+                  Center(
+                    child: QrImageView(
+                      data: tank['qrcode'], // ใช้ข้อมูล qrcode จาก Firestore
+                      size: 200.0,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // คลิกเพื่อลิงก์
+                  GestureDetector(
+                    onTap: () async {
+                      final url = tank['qrcode']; // ลิงก์ที่ได้จาก Firestore
+                      if (await canLaunch(url)) {
+                        await launch(url); // เปิดลิงก์ในเบราว์เซอร์
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text('ไม่สามารถเปิดลิงก์นี้ได้: $url')),
+                        );
+                      }
+                    },
+                    child: Text(
+                      tank['qrcode'],
+                      style: const TextStyle(
+                        color: Colors.blue,
+                        decoration: TextDecoration.underline,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
               ),
 
             const Spacer(),

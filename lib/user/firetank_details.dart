@@ -63,7 +63,7 @@ class FireTankDetailsPage extends StatelessWidget {
                             fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                       const SizedBox(height: 10),
-                      Text('ถังดับเพลิงที่: ${data['tank_number']}'),
+                      Text('ถังดับเพลิง ID: ${data['tank_id']}'),
                       Text('ประเภท: ${data['type']}'),
                       Text('อาคาร: ${data['building']}'),
                       Text('ชั้น: ${data['floor']}'),
@@ -145,7 +145,8 @@ class FireTankDetailsPage extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('วันที่: ${checkData['date_checked']}'),
+                                Text(
+                                    'วันที่: ${checkData['date_checked']} ${checkData['time_checked']}'),
                                 const SizedBox(height: 5),
                                 Text('ผู้ตรวจสอบ: ${checkData['inspector']}'),
                                 const SizedBox(height: 5),
@@ -169,7 +170,7 @@ class FireTankDetailsPage extends StatelessWidget {
                             ),
                           );
                         },
-                      ),
+                      )
                     ],
                   );
                 },

@@ -88,13 +88,6 @@ class _DashboardPageState extends State<DashboardPage> {
               Navigator.pushNamed(context, '/fire_tank_management');
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.qr_code),
-            title: const Text('Qr-code'),
-            onTap: () {
-              Navigator.pushNamed(context, '/qr_code');
-            },
-          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),

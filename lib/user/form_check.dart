@@ -3,6 +3,10 @@ import 'package:intl/intl.dart'; // สำหรับฟอร์แมตว�
 import 'package:cloud_firestore/cloud_firestore.dart'; // สำหรับ Firestore
 import 'firetank_details.dart'; // นำเข้าไฟล์ที่แสดงประวัติการตรวจสอบ
 
+import 'package:image_picker/image_picker.dart'; // สำหรับถ่ายภาพ
+import 'dart:io'; // สำหรับการจัดการไฟล์ภาพ
+import 'dart:typed_data'; // เพิ่มบรรทัดนี้
+
 class FormCheckPage extends StatefulWidget {
   final String tankId;
 
@@ -83,6 +87,32 @@ class _FormCheckPageState extends State<FormCheckPage> {
     });
   }
 
+  // ประกาศตัวแปร
+  File? selectedImage; // ใช้ File? สำหรับกรณีที่ตัวแปรอาจไม่มีค่า
+  Uint8List? _image; // ใช้ Uint8List? สำหรับเก็บข้อมูลภาพแบบไบต์
+
+  //Camera
+  Future<void> _pickImage() async {
+    try {
+      // ใช้ ImagePicker เพื่อเปิดกล้อง
+      final returnImage =
+          await ImagePicker().pickImage(source: ImageSource.camera);
+      if (returnImage == null) return; // ตรวจสอบว่าผู้ใช้ยกเลิกหรือไม่
+
+      // อัปเดต State ด้วยภาพที่เลือก
+      setState(() {
+        selectedImage = File(returnImage.path);
+        _image = File(returnImage.path).readAsBytesSync(); // อ่านไฟล์ภาพ
+      });
+
+      // ปิดหน้าจอหรือกล่องโต้ตอบ
+      Navigator.pop(context);
+    } catch (e) {
+      // จัดการข้อผิดพลาด
+      print("เกิดข้อผิดพลาด: $e");
+    }
+  }
+
   Future<void> saveDataToFirestore() async {
     // ตรวจสอบว่า date_checked, time_checked, equipment_status และ user_type ได้รับการกรอกหรือเลือก
     if (_dateController.text.isEmpty ||
@@ -97,7 +127,6 @@ class _FormCheckPageState extends State<FormCheckPage> {
 
     CollectionReference formChecks =
         FirebaseFirestore.instance.collection('form_checks');
-
     String docId =
         '${_dateController.text}_${widget.tankId}_${_inspectorController.text}';
 
@@ -203,15 +232,6 @@ class _FormCheckPageState extends State<FormCheckPage> {
                       controller: _dateController,
                       decoration: InputDecoration(
                         labelText: 'วันที่ตรวจสอบ',
-                        labelStyle: TextStyle(fontSize: fontSize),
-                      ),
-                      readOnly: true,
-                      style: TextStyle(fontSize: fontSize),
-                    ),
-                    TextField(
-                      controller: _timeController,
-                      decoration: InputDecoration(
-                        labelText: 'เวลา',
                         labelStyle: TextStyle(fontSize: fontSize),
                       ),
                       readOnly: true,
@@ -333,15 +353,18 @@ class _FormCheckPageState extends State<FormCheckPage> {
                         style: TextStyle(fontSize: fontSize),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: 20), // ระยะห่างระหว่างภาพและปุ่ม
+
                     ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.camera_alt),
+                      onPressed: _pickImage, // เรียกใช้ฟังก์ชัน _pickImage
+                      icon: const Icon(Icons.camera_alt), // ไอคอนกล้อง
                       label: Text(
-                        'ถ่ายภาพ',
-                        style: TextStyle(fontSize: fontSize),
+                        'ถ่ายภาพ..',
+                        style: TextStyle(
+                            fontSize: fontSize), // ใช้ขนาดตัวอักษรที่กำหนด
                       ),
                     ),
+
                     const SizedBox(height: 20),
                     TextField(
                       controller: _remarkController,

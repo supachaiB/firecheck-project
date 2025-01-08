@@ -9,7 +9,6 @@ import 'admin/dashboard.dart';
 import 'admin/fire_tank_status.dart';
 import 'user/form_check.dart';
 import 'admin/Fire_tank_management.dart';
-import 'admin/qr_code.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,8 +65,6 @@ class MyApp extends StatelessWidget {
           case '/inspectionhistory':
             return MaterialPageRoute(
                 builder: (context) => InspectionHistoryPage());
-          case '/qr_code':
-            return MaterialPageRoute(builder: (context) => QRCodePage());
           case '/fire_tank_management':
             return MaterialPageRoute(
                 builder: (context) => FireTankManagementPage());
