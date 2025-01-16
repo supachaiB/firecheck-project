@@ -10,7 +10,7 @@ class FireTankDetailsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('รายละเอียดถังดับเพลิงและประวัติการตรวจสอบ'),
+        title: Text('รายละเอียดถังดับเพลิงและประวัติการตรวจสอบ'),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -95,13 +95,23 @@ class FireTankDetailsPage extends StatelessWidget {
                     .collection('form_checks')
                     .where('tank_id',
                         isEqualTo: tankId) // ดึงข้อมูลประวัติของถังนี้
+                    .orderBy('date_checked',
+                        descending: true) // เรียงตามวันที่ล่าสุด
+                    .orderBy('time_checked',
+                        descending: true) // เรียงตามเวลาล่าสุด
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (snapshot.hasError) {
-                    return const Center(child: Text('เกิดข้อผิดพลาด'));
+                    // พิมพ์ข้อผิดพลาดที่เกิดขึ้นใน Console
+                    print('เกิดข้อผิดพลาด: ${snapshot.error}');
+
+                    // แสดงข้อความใน UI
+                    return Center(
+                      child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'),
+                    );
                   }
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                     return const Center(child: Text('ไม่พบประวัติการตรวจสอบ'));
@@ -118,6 +128,7 @@ class FireTankDetailsPage extends StatelessWidget {
                             fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                       const SizedBox(height: 10),
+                      // เอา Expanded ออกและใช้ shrinkWrap เพียงอย่างเดียว
                       ListView.builder(
                         shrinkWrap: true, // จำกัดความสูงของ ListView
                         physics:
@@ -125,9 +136,20 @@ class FireTankDetailsPage extends StatelessWidget {
                         itemCount: formChecks.length,
                         itemBuilder: (context, index) {
                           final checkData =
-                              formChecks[formChecks.length - 1 - index].data()!
-                                  as Map<String,
-                                      dynamic>; // ใช้การเข้าถึงแบบย้อนกลับ
+                              formChecks[index].data()! as Map<String, dynamic>;
+
+                          // พิมพ์ค่าที่ได้รับจาก Firestore
+                          print('Date Checked: ${checkData['date_checked']}');
+                          print('Time Checked: ${checkData['time_checked']}');
+                          print('Inspector: ${checkData['inspector']}');
+
+                          if (checkData['date_checked'] == null ||
+                              checkData['time_checked'] == null ||
+                              checkData['inspector'] == null) {
+                            return const Center(
+                                child: Text('ข้อมูลไม่ครบถ้วน'));
+                          }
+
                           Map<String, dynamic> equipmentStatus =
                               checkData['equipment_status'];
 

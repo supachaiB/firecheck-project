@@ -12,7 +12,44 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
   String? selectedBuilding;
   String? selectedFloor;
   String? selectedStatus;
-  String? sortBy;
+  String? sortBy = 'tank_number'; // เริ่มต้นการเรียงตามหมายเลขถัง
+
+  // ฟังก์ชันสำหรับการแก้ไขสถานะการตรวจสอบ
+  Future<void> _updateStatus(String tankId, String newStatus) async {
+    try {
+      // ค้นหาถังที่มี tank_id ตรงกับที่ระบุ
+      var docSnapshot = await FirebaseFirestore.instance
+          .collection('firetank_Collection')
+          .where('tank_id', isEqualTo: tankId) // ค้นหาจากฟิลด์ tank_id
+          .get();
+
+      if (docSnapshot.docs.isNotEmpty) {
+        // ถ้ามีข้อมูลตรงกับ tank_id
+        var docRef = docSnapshot.docs.first.reference;
+        // อัปเดตสถานะใน firetank_Collection
+        await docRef.update({'status': newStatus});
+
+        // อัปเดตสถานะใน form_checks
+        await FirebaseFirestore.instance
+            .collection('form_checks')
+            .where('tank_id', isEqualTo: tankId)
+            .get()
+            .then((snapshot) {
+          for (var doc in snapshot.docs) {
+            doc.reference.update({'status': newStatus});
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('สถานะการตรวจสอบได้รับการอัปเดต')));
+      } else {
+        throw Exception('ไม่พบถังที่มี tank_id: $tankId');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -116,31 +153,6 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                           const SizedBox(width: 10),
                         ],
                       ),
-                      Row(
-                        children: [
-                          const Text('เรียงตาม: '),
-                          DropdownButton<String>(
-                            value: sortBy,
-                            hint: const Text('เลือกการจัดเรียง'),
-                            items: [
-                              DropdownMenuItem(
-                                value: 'date',
-                                child:
-                                    const Text('วันที่ตรวจสอบ (ล่าสุดไปเก่า)'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'tank_number',
-                                child: const Text('หมายเลขถัง'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                sortBy = value;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
@@ -202,20 +214,27 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                                   'date_checked': 'N/A',
                                   'inspector': 'N/A',
                                   'user_type': 'N/A',
-                                  'equipment_status': 'N/A',
+                                  'status': 'N/A',
                                   'remarks': 'N/A'
                                 });
 
                         return {
                           'tank_id': tankId,
-                          'building': firetank['building'] ?? 'N/A',
-                          'floor': firetank['floor'] ?? 'N/A',
-                          'date_checked': formCheck['date_checked'] ?? 'N/A',
-                          'inspector': formCheck['inspector'] ?? 'N/A',
-                          'user_type': formCheck['user_type'] ?? 'N/A',
-                          'equipment_status':
-                              formCheck['equipment_status'] ?? 'N/A',
-                          'remarks': formCheck['remarks'] ?? 'N/A',
+                          'building': firetank['building']?.toString() ??
+                              'N/A', // แปลงเป็น String
+                          'floor': firetank['floor']?.toString() ??
+                              'N/A', // แปลงเป็น String
+                          'date_checked':
+                              formCheck['date_checked']?.toString() ??
+                                  'N/A', // แปลงเป็น String
+                          'inspector': formCheck['inspector']?.toString() ??
+                              'N/A', // แปลงเป็น String
+                          'user_type': formCheck['user_type']?.toString() ??
+                              'N/A', // แปลงเป็น String
+                          'status': firetank['status']?.toString() ??
+                              'N/A', // แปลงเป็น String
+                          'remarks': formCheck['remarks']?.toString() ??
+                              'N/A', // แปลงเป็น String
                         };
                       }).toList();
 
@@ -234,23 +253,12 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                       if (selectedStatus != null &&
                           selectedStatus!.isNotEmpty) {
                         combinedData = combinedData.where((inspection) {
-                          return inspection['equipment_status'] ==
-                              selectedStatus;
+                          return inspection['status'] == selectedStatus;
                         }).toList();
                       }
 
                       // การจัดเรียงข้อมูล
-                      if (sortBy == 'date') {
-                        combinedData.sort((a, b) {
-                          DateTime? dateA = a['date_checked'] is Timestamp
-                              ? (a['date_checked'] as Timestamp).toDate()
-                              : DateTime.tryParse(a['date_checked']);
-                          DateTime? dateB = b['date_checked'] is Timestamp
-                              ? (b['date_checked'] as Timestamp).toDate()
-                              : DateTime.tryParse(b['date_checked']);
-                          return dateB!.compareTo(dateA!); // ล่าสุดก่อน
-                        });
-                      } else if (sortBy == 'tank_number') {
+                      if (sortBy == 'tank_number') {
                         combinedData.sort((a, b) {
                           return a['tank_id'].compareTo(b['tank_id']);
                         });
@@ -268,6 +276,16 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                           DataColumn(label: Text('หมายเหตุ')),
                         ],
                         rows: combinedData.map((inspection) {
+                          Color statusColor = Colors.grey; // ค่าเริ่มต้นสีเทา
+
+                          if (inspection['status'] == 'ตรวจสอบแล้ว') {
+                            statusColor = Colors.green;
+                          } else if (inspection['status'] == 'ชำรุด') {
+                            statusColor = Colors.red;
+                          } else if (inspection['status'] == 'ส่งซ่อม') {
+                            statusColor = Colors.orange;
+                          }
+
                           return DataRow(cells: [
                             DataCell(Text(inspection['tank_id']?.toString() ??
                                 'N/A')), // ใช้ .toString()
@@ -276,19 +294,39 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                             DataCell(
                                 Text(inspection['floor']?.toString() ?? 'N/A')),
                             DataCell(Text(
-                                inspection['date_checked'] is Timestamp
-                                    ? (inspection['date_checked'] as Timestamp)
-                                        .toDate()
-                                        .toString()
-                                    : inspection['date_checked']?.toString() ??
-                                        'N/A')),
+                                inspection['date_checked']?.toString() ??
+                                    'N/A')),
                             DataCell(Text(
                                 inspection['inspector']?.toString() ?? 'N/A')),
                             DataCell(Text(
                                 inspection['user_type']?.toString() ?? 'N/A')),
-                            DataCell(Text(
-                                inspection['equipment_status']?.toString() ??
-                                    'N/A')),
+                            DataCell(
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: statusColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(inspection['status']?.toString() ??
+                                      'N/A'),
+                                  // ปุ่มแก้ไขสถานะ
+                                  IconButton(
+                                    icon: const Icon(Icons.edit),
+                                    onPressed: () {
+                                      // เปิด Dialog เพื่อเลือกสถานะใหม่
+                                      _showStatusDialog(
+                                          inspection['tank_id'] ?? '',
+                                          inspection['status'] ?? '');
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
                             DataCell(Text(
                                 inspection['remarks']?.toString() ?? 'N/A')),
                           ]);
@@ -302,6 +340,58 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
           ),
         ),
       ),
+    );
+  }
+
+  // Dialog ให้ผู้ใช้เลือกสถานะใหม่
+  void _showStatusDialog(String tankId, String currentStatus) {
+    String? newStatus = currentStatus;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('เลือกสถานะใหม่'),
+          content: DropdownButton<String>(
+            value: newStatus,
+            isExpanded: true,
+            items: ['ตรวจสอบแล้ว', 'ส่งซ่อม', 'ชำรุด', 'ยังไม่ตรวจสอบ']
+                .map((status) {
+              return DropdownMenuItem<String>(
+                value: status,
+                child: Text(status),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                newStatus = value;
+              });
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // ตรวจสอบว่า newStatus ไม่เป็น null ก่อนบันทึก
+                if (newStatus != null) {
+                  _updateStatus(
+                      tankId, newStatus!); // เพิ่ม ! เพื่อบอกว่าไม่เป็น null
+                  Navigator.pop(context);
+                } else {
+                  // จัดการกรณีที่ newStatus เป็น null
+                  // เช่น แสดงข้อความผิดพลาดหรือไม่ทำอะไร
+                }
+              },
+              child: const Text('บันทึก'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('ยกเลิก'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

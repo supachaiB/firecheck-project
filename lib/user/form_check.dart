@@ -80,11 +80,13 @@ class _FormCheckPageState extends State<FormCheckPage> {
   }
 
   void _filterStaff(String query) {
-    setState(() {
-      filteredStaffList = staffList
-          .where((staff) => staff.toLowerCase().contains(query.toLowerCase()))
-          .toList();
-    });
+    if (query.isNotEmpty) {
+      setState(() {
+        filteredStaffList = staffList
+            .where((staff) => staff.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      });
+    }
   }
 
   // ประกาศตัวแปร
@@ -130,7 +132,14 @@ class _FormCheckPageState extends State<FormCheckPage> {
     String docId =
         '${_dateController.text}_${widget.tankId}_${_inspectorController.text}';
 
+    // ตรวจสอบสถานะทั้งหมดของ equipmentStatus
+    String newStatus = 'ตรวจสอบแล้ว'; // ค่าเริ่มต้นเป็น 'ตรวจสอบแล้ว'
+    if (equipmentStatus.values.contains('ชำรุด')) {
+      newStatus = 'ชำรุด'; // ถ้ามี "ชำรุด" ให้เปลี่ยนสถานะเป็น "ชำรุด"
+    }
+
     try {
+      // บันทึกข้อมูลลงใน collection 'form_checks'
       await formChecks.doc(docId).set({
         'date_checked': _dateController.text,
         'time_checked': _timeController.text, // บันทึกเวลา
@@ -143,6 +152,22 @@ class _FormCheckPageState extends State<FormCheckPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('บันทึกข้อมูลเรียบร้อยแล้ว')),
         );
+      });
+
+      // อัปเดตฟิลด์ 'status' ใน firetank_Collection
+      CollectionReference firetankCollection =
+          FirebaseFirestore.instance.collection('firetank_Collection');
+
+      await firetankCollection
+          .where('tank_id', isEqualTo: widget.tankId)
+          .get()
+          .then((querySnapshot) {
+        if (querySnapshot.docs.isNotEmpty) {
+          // ถ้าพบ tank_id ที่ตรงกัน
+          querySnapshot.docs.first.reference.update({
+            'status': newStatus, // อัปเดตฟิลด์ 'status' เป็นค่าใหม่
+          });
+        }
       });
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -173,45 +198,132 @@ class _FormCheckPageState extends State<FormCheckPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'วันที่ตรวจสอบล่าสุด: ${latestCheckDate ?? 'กำลังโหลด...'} ${latestCheckTime ?? ''}',
-                      style: TextStyle(fontSize: fontSize),
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('form_checks')
+                          .where('tank_id', isEqualTo: widget.tankId)
+                          .orderBy('date_checked', descending: true)
+                          .orderBy('time_checked',
+                              descending:
+                                  true) // อ้างอิงจากเวลาเพื่อให้ได้ข้อมูลล่าสุด
+                          .limit(1)
+                          .snapshots(), // ใช้ snapshots() เพื่ออัปเดตข้อมูลแบบเรียลไทม์
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Text(
+                            'วันที่ตรวจสอบล่าสุด: กำลังโหลด...',
+                            style: TextStyle(fontSize: fontSize),
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          print(
+                              'เกิดข้อผิดพลาด: ${snapshot.error}'); // พิมพ์ข้อผิดพลาดที่เกิดขึ้นใน Console
+                          return Text(
+                            'วันที่ตรวจสอบล่าสุด: เกิดข้อผิดพลาด',
+                            style: TextStyle(fontSize: fontSize),
+                          );
+                        }
+
+                        if (snapshot.hasData &&
+                            snapshot.data!.docs.isNotEmpty) {
+                          final latestCheck = snapshot.data!.docs.first.data()
+                              as Map<String, dynamic>;
+                          final dateString =
+                              latestCheck['date_checked'] ?? 'ไม่มีข้อมูล';
+                          final timeString = latestCheck['time_checked'] ?? '';
+
+                          return Text(
+                            'วันที่ตรวจสอบล่าสุด: $dateString เวลา: $timeString',
+                            style: TextStyle(fontSize: fontSize),
+                          );
+                        } else {
+                          return Text(
+                            'วันที่ตรวจสอบล่าสุด: ไม่มีข้อมูล',
+                            style: TextStyle(fontSize: fontSize),
+                          );
+                        }
+                      },
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              'สถานะ: ',
-                              style: TextStyle(fontSize: fontSize),
-                            ),
-                            Icon(Icons.circle, color: Colors.green, size: 12),
-                            SizedBox(width: 8),
-                            Text(
-                              'ตรวจสอบแล้ว',
-                              style: TextStyle(fontSize: fontSize),
-                            ),
-                          ],
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => FireTankDetailsPage(
-                                  tankId: widget.tankId,
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('firetank_Collection')
+                          .where('tank_id', isEqualTo: widget.tankId)
+                          .limit(1)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Text(
+                            'สถานะล่าสุด: กำลังโหลด...',
+                            style: TextStyle(fontSize: fontSize),
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          return Text(
+                            'สถานะล่าสุด: เกิดข้อผิดพลาด',
+                            style: TextStyle(fontSize: fontSize),
+                          );
+                        }
+
+                        if (snapshot.hasData &&
+                            snapshot.data!.docs.isNotEmpty) {
+                          final latestStatus = snapshot.data!.docs.first.data()
+                              as Map<String, dynamic>;
+                          final status =
+                              latestStatus['status'] ?? 'ไม่มีข้อมูล';
+
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'สถานะล่าสุด: ',
+                                    style: TextStyle(fontSize: fontSize),
+                                  ),
+                                  Icon(
+                                    Icons.circle,
+                                    color: status == 'ชำรุด'
+                                        ? Colors.red
+                                        : Colors.green,
+                                    size: 12,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    status,
+                                    style: TextStyle(fontSize: fontSize),
+                                  ),
+                                ],
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => FireTankDetailsPage(
+                                        tankId: widget.tankId,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  'ดูทั้งหมด',
+                                  style: TextStyle(fontSize: fontSize),
                                 ),
                               ),
-                            );
-                          },
-                          child: Text(
-                            'ดูทั้งหมด',
+                            ],
+                          );
+                        } else {
+                          return Text(
+                            'สถานะล่าสุด: ไม่มีข้อมูล',
                             style: TextStyle(fontSize: fontSize),
-                          ),
-                        ),
-                      ],
+                          );
+                        }
+                      },
                     ),
                   ],
                 ),
