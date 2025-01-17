@@ -289,7 +289,10 @@ class _FormCheckPageState extends State<FormCheckPage> {
                                     Icons.circle,
                                     color: status == 'ชำรุด'
                                         ? Colors.red
-                                        : Colors.green,
+                                        : status == 'ส่งซ่อม'
+                                            ? Colors.orange
+                                            : Colors
+                                                .green, // สีส้มสำหรับสถานะ "ส่งซ่อม"
                                     size: 12,
                                   ),
                                   SizedBox(width: 8),
