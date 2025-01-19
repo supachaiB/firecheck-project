@@ -51,6 +51,34 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
     }
   }
 
+  Future<void> _deleteTank(String tankId) async {
+    try {
+      // ลบจาก firetank_Collection
+      var firetankDocs = await FirebaseFirestore.instance
+          .collection('firetank_Collection')
+          .where('tank_id', isEqualTo: tankId)
+          .get();
+      for (var doc in firetankDocs.docs) {
+        await doc.reference.delete();
+      }
+
+      // ลบจาก form_checks
+      var formCheckDocs = await FirebaseFirestore.instance
+          .collection('form_checks')
+          .where('tank_id', isEqualTo: tankId)
+          .get();
+      for (var doc in formCheckDocs.docs) {
+        await doc.reference.delete();
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ลบถังและข้อมูลการตรวจสอบเรียบร้อย')));
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -184,6 +212,9 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                   return StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('form_checks')
+                        .orderBy('date_checked',
+                            descending: true) // เรียงจากวันที่ล่าสุด
+
                         .snapshots(),
                     builder: (context, formChecksSnapshot) {
                       if (formChecksSnapshot.connectionState ==
@@ -197,26 +228,48 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                             child: Text('ไม่มีข้อมูลใน Form Checks'));
                       }
 
+// ดึงข้อมูลล่าสุดสำหรับ tank_id แต่ละรายการ
+                      Map<String, Map<String, dynamic>> latestFormChecks = {};
+                      for (var doc in formChecksSnapshot.data!.docs) {
+                        Map<String, dynamic> data =
+                            doc.data() as Map<String, dynamic>;
+                        String tankId = data['tank_id'] ?? 'N/A';
+
+                        // เก็บข้อมูลล่าสุดของแต่ละ tank_id
+                        if (!latestFormChecks.containsKey(tankId)) {
+                          latestFormChecks[tankId] = data;
+                        }
+                      }
                       List<Map<String, dynamic>> formChecksData =
                           formChecksSnapshot.data!.docs
                               .map((doc) => doc.data() as Map<String, dynamic>)
                               .toList();
 
-                      // รวมข้อมูลจากทั้งสอง collection
+                      // รวมข้อมูลจากทั้งสอง collection โดยใช้วันที่ตรวจสอบล่าสุด
                       List<Map<String, dynamic>> combinedData =
                           firetankData.map((firetank) {
                         String tankId = firetank['tank_id'] ?? 'N/A';
 
-                        // หา form_check ที่ตรงกับ tank_id
-                        var formCheck = formChecksData.firstWhere(
-                            (check) => check['tank_id'] == tankId,
-                            orElse: () => {
-                                  'date_checked': 'N/A',
-                                  'inspector': 'N/A',
-                                  'user_type': 'N/A',
-                                  'status': 'N/A',
-                                  'remarks': 'N/A'
-                                });
+                        // หา form_check ที่มี date_checked ล่าสุดและ tank_id ตรงกัน
+                        var relevantFormChecks = formChecksData
+                            .where((check) => check['tank_id'] == tankId);
+                        var latestFormCheck = relevantFormChecks.isNotEmpty
+                            ? relevantFormChecks.reduce((a, b) {
+                                DateTime dateA =
+                                    DateTime.tryParse(a['date_checked']) ??
+                                        DateTime.fromMillisecondsSinceEpoch(0);
+                                DateTime dateB =
+                                    DateTime.tryParse(b['date_checked']) ??
+                                        DateTime.fromMillisecondsSinceEpoch(0);
+                                return dateA.isAfter(dateB) ? a : b;
+                              })
+                            : {
+                                'date_checked': 'N/A',
+                                'inspector': 'N/A',
+                                'user_type': 'N/A',
+                                'status': 'N/A',
+                                'remarks': 'N/A'
+                              };
 
                         return {
                           'tank_id': tankId,
@@ -225,15 +278,17 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                           'floor': firetank['floor']?.toString() ??
                               'N/A', // แปลงเป็น String
                           'date_checked':
-                              formCheck['date_checked']?.toString() ??
+                              latestFormCheck['date_checked']?.toString() ??
                                   'N/A', // แปลงเป็น String
-                          'inspector': formCheck['inspector']?.toString() ??
-                              'N/A', // แปลงเป็น String
-                          'user_type': formCheck['user_type']?.toString() ??
-                              'N/A', // แปลงเป็น String
+                          'inspector':
+                              latestFormCheck['inspector']?.toString() ??
+                                  'N/A', // แปลงเป็น String
+                          'user_type':
+                              latestFormCheck['user_type']?.toString() ??
+                                  'N/A', // แปลงเป็น String
                           'status': firetank['status']?.toString() ??
                               'N/A', // แปลงเป็น String
-                          'remarks': formCheck['remarks']?.toString() ??
+                          'remarks': latestFormCheck['remarks']?.toString() ??
                               'N/A', // แปลงเป็น String
                         };
                       }).toList();
@@ -274,6 +329,8 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                           DataColumn(label: Text('ประเภทผู้ใช้')),
                           DataColumn(label: Text('ผลการตรวจสอบ')),
                           DataColumn(label: Text('หมายเหตุ')),
+                          DataColumn(
+                              label: Text('การกระทำ')), // เพิ่มคอลัมน์การกระทำ
                         ],
                         rows: combinedData.map((inspection) {
                           Color statusColor = Colors.grey; // ค่าเริ่มต้นสีเทา
@@ -307,28 +364,48 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                                     width: 12,
                                     height: 12,
                                     decoration: BoxDecoration(
-                                      color: statusColor,
+                                      color:
+                                          inspection['status'] == 'ตรวจสอบแล้ว'
+                                              ? Colors.green
+                                              : inspection['status'] == 'ชำรุด'
+                                                  ? Colors.red
+                                                  : inspection['status'] ==
+                                                          'ส่งซ่อม'
+                                                      ? Colors.orange
+                                                      : Colors.grey,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
                                   const SizedBox(width: 10),
                                   Text(inspection['status']?.toString() ??
-                                      'N/A'),
-                                  // ปุ่มแก้ไขสถานะ
-                                  IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () {
-                                      // เปิด Dialog เพื่อเลือกสถานะใหม่
-                                      _showStatusDialog(
-                                          inspection['tank_id'] ?? '',
-                                          inspection['status'] ?? '');
-                                    },
-                                  ),
+                                      'N/A'), // ใช้ text จาก field status
                                 ],
                               ),
                             ),
                             DataCell(Text(
                                 inspection['remarks']?.toString() ?? 'N/A')),
+                            DataCell(
+                              // คอลัมน์การกระทำ
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit),
+                                    onPressed: () {
+                                      _showStatusDialog(
+                                          inspection['tank_id'] ?? '',
+                                          inspection['status'] ?? '');
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
+                                    onPressed: () {
+                                      _deleteTank(inspection['tank_id'] ?? '');
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
                           ]);
                         }).toList(),
                       );
