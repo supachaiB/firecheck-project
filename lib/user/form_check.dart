@@ -116,6 +116,11 @@ class _FormCheckPageState extends State<FormCheckPage> {
   }
 
   Future<void> saveDataToFirestore() async {
+    // อัปเดตเวลาเป็นปัจจุบันก่อนบันทึก
+    final currentDateTime = DateTime.now();
+    _dateController.text = DateFormat('yyyy-MM-dd').format(currentDateTime);
+    _timeController.text = DateFormat('HH:mm').format(currentDateTime);
+
     // ตรวจสอบว่า date_checked, time_checked, equipment_status และ user_type ได้รับการกรอกหรือเลือก
     if (_dateController.text.isEmpty ||
         _timeController.text.isEmpty ||

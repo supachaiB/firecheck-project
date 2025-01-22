@@ -3,6 +3,7 @@ import 'package:firecheck_setup/admin/dashboard_section/status_section.dart';
 import 'package:firecheck_setup/admin/dashboard_section/damage_info_section.dart';
 import 'package:firecheck_setup/admin/dashboard_section/graph_info_section.dart';
 import 'package:firecheck_setup/admin/dashboard_section/trend_line_chart_section.dart';
+import 'package:firecheck_setup/admin/fire_tank_status.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -30,7 +31,9 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            StatusSection(), // ใช้ section ที่แยกออกมา
+            // ใช้ section ที่แยกออกมา
+            //FireTankStatusPage(),
+            //StatusSection(),
             const SizedBox(height: 20),
             const DamageInfoSection(),
             const SizedBox(height: 20),

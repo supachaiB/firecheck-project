@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async'; // ใช้ Timer
+import 'package:rxdart/rxdart.dart';
 
 class FireTankStatusPage extends StatefulWidget {
   @override
@@ -6,50 +9,134 @@ class FireTankStatusPage extends StatefulWidget {
 }
 
 class _FireTankStatusPageState extends State<FireTankStatusPage> {
-  // ข้อมูลจำลอง (สร้างด้วย Loop)
-  final List<Map<String, dynamic>> buildings = [
-    for (var building in [
-      "10 ชั้น",
-      "หลวงปู่ขาว",
-      "OPD",
-      "114 เตียง",
-      "NSU",
-      "60 เตียง",
-      "เมตตา",
-      "โภชนาศาสตร์",
-      "จิตเวช",
-      "กายภาพ&ธนาคารเลือด",
-      "พัฒนากระตุ้นเด็ก",
-      "จ่ายกลาง",
-      "ซักฟอก",
-      "ผลิตงาน & โรงงานช่าง"
-    ])
-      {
-        "building": building,
-        "floors": List.generate(10, (floorIndex) {
-          return {
-            "floor": "ชั้น ${floorIndex + 1}",
-            "tanks": List.generate(3, (tankIndex) {
-              return {
-                "tankNumber": "${building}-${floorIndex + 1}-${tankIndex + 1}",
-                "status": (tankIndex % 3 == 0)
-                    ? "ตรวจสอบแล้ว"
-                    : (tankIndex % 3 == 1)
-                        ? "ส่งซ่อม"
-                        : "ยังไม่ตรวจสอบ",
-                "lastChecked": "2024-10-${(tankIndex + 1) * 2}",
-              };
-            }),
-          };
-        }),
-      }
-  ];
+  late Stream<int> totalTanksStream;
+  late Stream<int> checkedCountStream;
+  late Stream<int> brokenCountStream;
+  late Stream<int> repairCountStream;
 
-  String? selectedBuilding;
-  String? selectedFloor;
-  String? selectedStatus;
-  String? selectedDate;
-  List<Map<String, dynamic>> filteredTanks = [];
+  // เพิ่ม Stream รวม
+  Stream<Map<String, int>> get combinedStreams {
+    return Rx.combineLatest4<int, int, int, int, Map<String, int>>(
+      totalTanksStream,
+      checkedCountStream,
+      brokenCountStream,
+      repairCountStream,
+      (total, checked, broken, repair) => {
+        "totalTanks": total,
+        "checkedCount": checked,
+        "brokenCount": broken,
+        "repairCount": repair,
+      },
+    );
+  }
+
+  int remainingTime = 120; // เริ่มต้นที่ 2 นาที (120 วินาที)
+  late int remainingQuarterTime;
+  late Timer _timer;
+
+  int _calculateRemainingTime() {
+    final now = DateTime.now();
+    final nextResetDate =
+        DateTime(now.year, now.month + 1, 1); // วันที่ 1 ของเดือนถัดไป
+    return nextResetDate.difference(now).inSeconds; // เวลาที่เหลือในวินาที
+  }
+
+  DateTime _calculateNextQuarterEnd() {
+    final now = DateTime.now();
+    int nextQuarterMonth;
+
+    // หาค่าเดือนที่สิ้นสุดของไตรมาสถัดไป
+    if (now.month <= 3) {
+      nextQuarterMonth = 3; // ไตรมาสแรก
+    } else if (now.month <= 6) {
+      nextQuarterMonth = 6; // ไตรมาสที่สอง
+    } else if (now.month <= 9) {
+      nextQuarterMonth = 9; // ไตรมาสที่สาม
+    } else {
+      nextQuarterMonth = 12; // ไตรมาสสุดท้าย
+    }
+
+    // คืนค่าวันที่สิ้นสุดของไตรมาส
+    return DateTime(now.year, nextQuarterMonth + 1, 1)
+        .subtract(Duration(days: 1));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    totalTanksStream = _getTotalTanksStream();
+    checkedCountStream = _getStatusCountStream('ตรวจสอบแล้ว');
+    brokenCountStream = _getStatusCountStream('ชำรุด');
+    repairCountStream = _getStatusCountStream('ส่งซ่อม');
+
+    remainingTime = _calculateRemainingTime(); // คำนวณเวลาที่เหลือ
+    remainingQuarterTime = _calculateNextQuarterEnd()
+        .difference(DateTime.now())
+        .inSeconds; // สำหรับช่างเทคนิค
+
+    _startTimer();
+  }
+
+  // ฟังก์ชันเริ่มนับเวลา
+  void _startTimer() {
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        if (remainingTime > 0) {
+          remainingTime--; // ลดเวลาผู้ใช้ทั่วไป
+        } else {
+          _updateAllTanksStatus(); // รีเซตสถานะ
+          remainingTime = _calculateRemainingTime(); // รีเซตเวลาใหม่
+        }
+
+        if (remainingQuarterTime > 0) {
+          remainingQuarterTime--; // ลดเวลาของช่างเทคนิค
+        } else {
+          // รีเซตเวลาไตรมาสใหม่
+          remainingQuarterTime =
+              _calculateNextQuarterEnd().difference(DateTime.now()).inSeconds;
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel(); // ยกเลิก Timer
+    super.dispose();
+  }
+
+  // อัพเดตสถานะทุกๆ document ใน Firestore ให้เป็น "ยังไม่ตรวจสอบ"
+  Future<void> _updateAllTanksStatus() async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('firetank_Collection')
+          .get();
+
+      for (var doc in querySnapshot.docs) {
+        await doc.reference.update({'status': 'ยังไม่ตรวจสอบ'});
+      }
+      print('Updated all tanks to "ยังไม่ตรวจสอบ"');
+    } catch (e) {
+      print("Error updating tanks: $e");
+    }
+  }
+
+  // สร้าง Stream สำหรับจำนวนเอกสารทั้งหมด
+  Stream<int> _getTotalTanksStream() {
+    return FirebaseFirestore.instance
+        .collection('firetank_Collection')
+        .snapshots()
+        .map((snapshot) => snapshot.size);
+  }
+
+  // สร้าง Stream สำหรับสถานะเฉพาะ
+  Stream<int> _getStatusCountStream(String status) {
+    return FirebaseFirestore.instance
+        .collection('firetank_Collection')
+        .where('status', isEqualTo: status)
+        .snapshots()
+        .map((snapshot) => snapshot.size);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,19 +149,23 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
         padding: const EdgeInsets.all(8.0),
         child: Column(
           children: [
-            // กล่องสรุปภาพรวมสถานะถัง
-            _buildStatusSummaryBox(),
-
+            _buildScheduleBox(),
             SizedBox(height: 10),
-
-            // กล่องกรองข้อมูล
-            _buildFilterBox(),
-
-            // แสดงข้อมูลถังดับเพลิงในรูปแบบตาราง
-            if (selectedFloor != null && selectedBuilding != null)
-              Expanded(
-                child: _buildDataTable(),
-              ),
+            StreamBuilder<Map<String, int>>(
+              stream: combinedStreams,
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return Center(child: CircularProgressIndicator());
+                }
+                final data = snapshot.data!;
+                return _buildStatusSummaryBox(
+                  totalTanks: data["totalTanks"]!,
+                  checkedCount: data["checkedCount"]!,
+                  brokenCount: data["brokenCount"]!,
+                  repairCount: data["repairCount"]!,
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -82,23 +173,12 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
   }
 
   // ฟังก์ชันสร้างกล่องสรุปภาพรวมสถานะ
-  Widget _buildStatusSummaryBox() {
-    int checkedCount = 0;
-    int notCheckedCount = 0;
-    int brokenCount = 0;
-    int repairCount = 0;
-
-    for (var building in buildings) {
-      for (var floor in building['floors']) {
-        for (var tank in floor['tanks']) {
-          if (tank['status'] == 'ตรวจสอบแล้ว') checkedCount++;
-          if (tank['status'] == 'ยังไม่ตรวจสอบ') notCheckedCount++;
-          if (tank['status'] == 'ชำรุด') brokenCount++;
-          if (tank['status'] == 'ส่งซ่อม') repairCount++;
-        }
-      }
-    }
-
+  Widget _buildStatusSummaryBox({
+    required int totalTanks,
+    required int checkedCount,
+    required int brokenCount,
+    required int repairCount,
+  }) {
     return Card(
       elevation: 2,
       margin: EdgeInsets.symmetric(vertical: 10),
@@ -107,12 +187,12 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildSummaryCard(
-                "ถังทั้งหมด",
-                checkedCount + notCheckedCount + brokenCount + repairCount,
-                Colors.blue),
+            _buildSummaryCard("ถังทั้งหมด", totalTanks, Colors.blue),
             _buildSummaryCard("ตรวจสอบแล้ว", checkedCount, Colors.green),
-            _buildSummaryCard("ยังไม่ตรวจสอบ", notCheckedCount, Colors.grey),
+            _buildSummaryCard(
+                "ยังไม่ตรวจสอบ",
+                totalTanks - checkedCount - brokenCount - repairCount,
+                Colors.grey),
             _buildSummaryCard("ชำรุด", brokenCount, Colors.red),
             _buildSummaryCard("ส่งซ่อม", repairCount, Colors.orange),
           ],
@@ -139,254 +219,47 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
     );
   }
 
-  // กล่องกรองข้อมูล
-  Widget _buildFilterBox() {
-    return Card(
-      elevation: 2,
-      margin: EdgeInsets.symmetric(vertical: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                // ตัวกรองสถานที่ (อาคาร)
-                Expanded(
-                  child: DropdownButton<String>(
-                    value: selectedBuilding,
-                    hint: Text("เลือกอาคาร"),
-                    isExpanded: true,
-                    items: buildings.map((building) {
-                      return DropdownMenuItem<String>(
-                        value: building["building"],
-                        child: Text(building["building"]),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedBuilding = value;
-                        selectedFloor = null;
-                        filteredTanks.clear();
-                      });
-                    },
-                  ),
-                ),
+  // ฟังก์ชันสร้างกล่องกำหนดการ
+  Widget _buildScheduleBox() {
+    int days = remainingTime ~/ (24 * 3600); // คำนวณจำนวนวัน
+    int hours = (remainingTime % (24 * 3600)) ~/ 3600; // คำนวณชั่วโมง
+    int minutes = (remainingTime % 3600) ~/ 60; // คำนวณนาที
+    int seconds = remainingTime % 60; // คำนวณวินาที
 
-                SizedBox(width: 10),
-
-                // ตัวกรองสถานที่ (ชั้น)
-                if (selectedBuilding != null)
-                  Expanded(
-                    child: DropdownButton<String>(
-                      value: selectedFloor,
-                      hint: Text("เลือกชั้น"),
-                      isExpanded: true,
-                      items: buildings
-                          .firstWhere((building) =>
-                              building["building"] ==
-                              selectedBuilding)["floors"]
-                          .map<DropdownMenuItem<String>>((floor) {
-                        return DropdownMenuItem<String>(
-                          value: floor["floor"],
-                          child: Text(floor["floor"]),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedFloor = value;
-                          _filterTanks();
-                        });
-                      },
-                    ),
-                  ),
-              ],
-            ),
-
-            SizedBox(height: 10),
-
-            // ตัวกรองสถานะ
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButton<String>(
-                    value: selectedStatus,
-                    hint: Text("กรองตามสถานะ"),
-                    isExpanded: true,
-                    items: ['ตรวจสอบแล้ว', 'ยังไม่ตรวจสอบ', 'ชำรุด', 'ส่งซ่อม']
-                        .map((status) {
-                      return DropdownMenuItem<String>(
-                        value: status,
-                        child: Text(status),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedStatus = value;
-                        _filterTanks();
-                      });
-                    },
-                  ),
-                ),
-                SizedBox(width: 10),
-
-                // ตัวกรองวันที่ตรวจสอบล่าสุด
-                Expanded(
-                  child: DropdownButton<String>(
-                    value: selectedDate,
-                    hint: Text("เลือกวันที่ตรวจสอบ"),
-                    isExpanded: true,
-                    items: List.generate(31, (index) {
-                      final day = index + 1;
-                      return DropdownMenuItem<String>(
-                        value: '2024-10-$day',
-                        child: Text('2024-10-$day'),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedDate = value;
-                        _filterTanks();
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ฟังก์ชันแสดงข้อมูลในรูปแบบตาราง
-  Widget _buildDataTable() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: [
-          DataColumn(label: Text('หมายเลขถัง')),
-          DataColumn(label: Text('สถานะ')),
-          DataColumn(label: Text('วันที่ตรวจสอบ')),
-          DataColumn(label: Text('อัปเดตสถานะ')),
-        ],
-        rows: filteredTanks.map((tank) {
-          return DataRow(
-            cells: [
-              DataCell(Text(tank['tankNumber'] ?? '')),
-              DataCell(
-                Row(
-                  children: [
-                    Icon(
-                      Icons.circle,
-                      color: _getStatusColor(tank['status'] ?? ''),
-                      size: 12,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(tank['status'] ?? ''),
-                  ],
+    int quarterDays = remainingQuarterTime ~/ (24 * 3600);
+    int quarterHours = (remainingQuarterTime % (24 * 3600)) ~/ 3600;
+    int quarterMinutes = (remainingQuarterTime % 3600) ~/ 60;
+    int quarterSeconds = remainingQuarterTime % 60;
+    return Align(
+      alignment: Alignment.centerLeft, // จัดชิดซ้าย
+      child: Card(
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start, // ชิดซ้ายในกล่อง
+            children: [
+              Text(
+                "กำหนดการตรวจ",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.redAccent,
                 ),
               ),
-              DataCell(Text(tank['lastChecked'] ?? '')),
-              DataCell(
-                IconButton(
-                  icon: Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () {
-                    _showUpdateStatusDialog(tank);
-                  },
-                ),
+              SizedBox(height: 4),
+              Text(
+                "ผู้ใช้ทั่วไปเหลือ :  $days วัน $hours ชั่วโมง $minutes นาที $seconds วินาที",
+                style: TextStyle(fontSize: 14),
+              ),
+              Text(
+                "ช่างเทคนิคเหลือ : $quarterDays วัน $quarterHours ชั่วโมง $quarterMinutes นาที $quarterSeconds วินาที",
+                style: TextStyle(fontSize: 14),
               ),
             ],
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  // ฟังก์ชันกำหนดสีของจุดตามสถานะ
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'ตรวจสอบแล้ว':
-        return Colors.green;
-      case 'ส่งซ่อม':
-        return Colors.orange;
-      case 'ชำรุด':
-        return Colors.red;
-      case 'ยังไม่ตรวจสอบ':
-        return Colors.grey;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  // ฟังก์ชันกรองข้อมูลถังดับเพลิง
-  void _filterTanks() {
-    if (selectedBuilding != null && selectedFloor != null) {
-      var floors = buildings.firstWhere(
-          (building) => building["building"] == selectedBuilding)["floors"];
-      filteredTanks = floors
-          .firstWhere((floor) => floor["floor"] == selectedFloor)["tanks"]
-          .cast<
-              Map<String, dynamic>>(); // เปลี่ยน cast เป็น Map<String, dynamic>
-
-      if (selectedStatus != null) {
-        filteredTanks = filteredTanks
-            .where((tank) => tank["status"] == selectedStatus)
-            .toList();
-      }
-
-      if (selectedDate != null && selectedDate!.isNotEmpty) {
-        filteredTanks = filteredTanks
-            .where((tank) => tank["lastChecked"] == selectedDate)
-            .toList();
-      }
-    }
-  }
-
-  // ฟังก์ชันแสดง Dialog สำหรับอัปเดตสถานะถัง
-  void _showUpdateStatusDialog(Map<String, dynamic> tank) {
-    String? updatedStatus = tank['status'];
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('อัปเดตสถานะถังหมายเลข ${tank['tankNumber']}'),
-          content: DropdownButton<String>(
-            value: updatedStatus,
-            hint: Text("เลือกสถานะใหม่"),
-            isExpanded: true,
-            items: ['ตรวจสอบแล้ว', 'ยังไม่ตรวจสอบ', 'ชำรุด', 'ส่งซ่อม']
-                .map((status) {
-              return DropdownMenuItem<String>(
-                value: status,
-                child: Text(status),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                updatedStatus = value;
-              });
-            },
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  tank['status'] = updatedStatus ?? tank['status'];
-                });
-                Navigator.of(context).pop();
-              },
-              child: Text('บันทึก'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('ยกเลิก'),
-            ),
-          ],
-        );
-      },
+        ),
+      ),
     );
   }
 }
