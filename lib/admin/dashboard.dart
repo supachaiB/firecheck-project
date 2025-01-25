@@ -3,6 +3,8 @@ import 'package:firecheck_setup/admin/dashboard_section/damage_info_section.dart
 import 'package:firecheck_setup/admin/dashboard_section/graph_info_section.dart';
 import 'package:firecheck_setup/admin/dashboard_section/trend_line_chart_section.dart';
 import 'package:firecheck_setup/admin/dashboard_section/status_summary.dart';
+import 'package:firecheck_setup/admin/dashboard_section/scheduleBox.dart';
+import 'package:firecheck_setup/admin/fire_tank_status.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -13,15 +15,16 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  int remainingTime = FireTankStatusPageState.calculateRemainingTime();
+  int remainingQuarterTimeInSeconds =
+      FireTankStatusPageState.calculateNextQuarterEnd()
+          .difference(DateTime.now())
+          .inSeconds;
+
   int totalTanks = 0;
   int checkedCount = 0;
   int brokenCount = 0;
   int repairCount = 0;
-
-  int selectedYear = DateTime.now().year;
-  String selectedUserType =
-      'ผู้ใช้ทั่วไป'; // กำหนดค่าเริ่มต้นให้ตรงกับ Dropdown
-  int inspectionCycle = 30; // รอบการตรวจสอบเริ่มต้นสำหรับผู้ใช้ทั่วไป
 
   // ดึงข้อมูลจาก Firestore
   void _fetchFireTankData() async {
@@ -55,6 +58,11 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _fetchFireTankData(); // ดึงข้อมูลเมื่อหน้าเริ่มต้น
+
+    remainingQuarterTimeInSeconds =
+        FireTankStatusPageState.calculateNextQuarterEnd()
+            .difference(DateTime.now())
+            .inSeconds;
   }
 
   @override
@@ -65,26 +73,56 @@ class _DashboardPageState extends State<DashboardPage> {
         backgroundColor: Colors.deepPurple,
       ),
       drawer: _buildDrawer(context),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ใช้ Widget StatusSummary พร้อมกับส่งข้อมูลที่ดึงมาจาก Firestore
-            StatusSummaryWidget(
-              totalTanks: totalTanks,
-              checkedCount: checkedCount,
-              brokenCount: brokenCount,
-              repairCount: repairCount,
-            ), //StatusSection(),
-            const SizedBox(height: 20),
-            const DamageInfoSection(),
-            const SizedBox(height: 20),
-            //const GraphInfoSection(),
-            const SizedBox(height: 20),
-            const TrendLineChartSection(),
-          ],
-        ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('firetank_Collection')
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (!snapshot.hasData || snapshot.data == null) {
+            return const Center(child: Text('ไม่พบข้อมูลถังดับเพลิง'));
+          }
+          // ดึงข้อมูลสถานะจาก snapshot
+          final tanks = snapshot.data!.docs;
+          final totalTanks = tanks.length;
+          final checkedCount =
+              tanks.where((doc) => doc['status'] == 'ตรวจสอบแล้ว').length;
+          final brokenCount =
+              tanks.where((doc) => doc['status'] == 'ชำรุด').length;
+          final repairCount =
+              tanks.where((doc) => doc['status'] == 'ส่งซ่อม').length;
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ใช้ Widget StatusSummary พร้อมกับส่งข้อมูลที่ดึงมาจาก Firestore
+                ScheduleBox(
+                  remainingTime: remainingTime,
+                  remainingQuarterTime: remainingQuarterTimeInSeconds,
+                ),
+                const SizedBox(height: 10),
+
+                StatusSummaryWidget(
+                  totalTanks: totalTanks,
+                  checkedCount: checkedCount,
+                  brokenCount: brokenCount,
+                  repairCount: repairCount,
+                ),
+                const SizedBox(height: 20),
+                const DamageInfoSection(),
+                const SizedBox(height: 20),
+                //const GraphInfoSection(),
+                const SizedBox(height: 20),
+                const TrendLineChartSection(),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

@@ -1,45 +1,64 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DamageInfoSection extends StatelessWidget {
   const DamageInfoSection({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 5,
-            blurRadius: 7,
-            offset: const Offset(0, 3),
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('firetank_Collection')
+          .where('status', isEqualTo: 'ชำรุด') // เพิ่มเงื่อนไขที่นี่
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'));
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text('ไม่มีข้อมูลการชำรุด'));
+        }
+
+        final damageList = snapshot.data!.docs;
+
+        return Container(
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                spreadRadius: 5,
+                blurRadius: 7,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionTitle('ข้อมูลการชำรุด'),
-          const SizedBox(height: 10),
-          _buildDamageAlert(
-            tankId: "fire001",
-            type: "ถัง CO2",
-            building: "อาคาร A",
-            floor: "ชั้น 2",
-            reportDate: "10/10/2024",
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle('ข้อมูลการชำรุด'),
+              const SizedBox(height: 10),
+              ...damageList.map((damage) {
+                final data = damage.data() as Map<String, dynamic>;
+                return _buildDamageAlert(
+                  tankId: data['tank_id'] ?? 'ไม่ระบุ',
+                  type: data['type'] ?? 'ไม่ระบุ',
+                  building: data['building'] ?? 'ไม่ระบุ',
+                  floor: data['floor'] ?? 'ไม่ระบุ',
+                  reportDate: data['reportDate'] ?? '-',
+                );
+              }).toList(),
+            ],
           ),
-          _buildDamageAlert(
-            tankId: "fire002",
-            type: "ถังเคมี",
-            building: "อาคาร B",
-            floor: "ชั้น 1",
-            reportDate: "11/10/2024",
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

@@ -4,11 +4,13 @@ import 'dart:async'; // ใช้ Timer
 import 'package:rxdart/rxdart.dart';
 
 class FireTankStatusPage extends StatefulWidget {
+  const FireTankStatusPage({Key? key}) : super(key: key);
+
   @override
-  _FireTankStatusPageState createState() => _FireTankStatusPageState();
+  FireTankStatusPageState createState() => FireTankStatusPageState();
 }
 
-class _FireTankStatusPageState extends State<FireTankStatusPage> {
+class FireTankStatusPageState extends State<FireTankStatusPage> {
   late Stream<int> totalTanksStream;
   late Stream<int> checkedCountStream;
   late Stream<int> brokenCountStream;
@@ -34,14 +36,15 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
   late int remainingQuarterTime;
   late Timer _timer;
 
-  int _calculateRemainingTime() {
+  static int calculateRemainingTime() {
     final now = DateTime.now();
     final nextResetDate =
         DateTime(now.year, now.month + 1, 1); // วันที่ 1 ของเดือนถัดไป
     return nextResetDate.difference(now).inSeconds; // เวลาที่เหลือในวินาที
+    //return 5;
   }
 
-  DateTime _calculateNextQuarterEnd() {
+  static DateTime calculateNextQuarterEnd() {
     final now = DateTime.now();
     int nextQuarterMonth;
 
@@ -69,23 +72,23 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
     brokenCountStream = _getStatusCountStream('ชำรุด');
     repairCountStream = _getStatusCountStream('ส่งซ่อม');
 
-    remainingTime = _calculateRemainingTime(); // คำนวณเวลาที่เหลือ
-    remainingQuarterTime = _calculateNextQuarterEnd()
+    remainingTime = calculateRemainingTime(); // คำนวณเวลาที่เหลือ
+    remainingQuarterTime = calculateNextQuarterEnd()
         .difference(DateTime.now())
         .inSeconds; // สำหรับช่างเทคนิค
 
-    _startTimer();
+    startTimer();
   }
 
   // ฟังก์ชันเริ่มนับเวลา
-  void _startTimer() {
+  void startTimer() {
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {
         if (remainingTime > 0) {
           remainingTime--; // ลดเวลาผู้ใช้ทั่วไป
         } else {
           _updateAllTanksStatus(); // รีเซตสถานะ
-          remainingTime = _calculateRemainingTime(); // รีเซตเวลาใหม่
+          remainingTime = calculateRemainingTime(); // รีเซตเวลาใหม่
         }
 
         if (remainingQuarterTime > 0) {
@@ -93,7 +96,7 @@ class _FireTankStatusPageState extends State<FireTankStatusPage> {
         } else {
           // รีเซตเวลาไตรมาสใหม่
           remainingQuarterTime =
-              _calculateNextQuarterEnd().difference(DateTime.now()).inSeconds;
+              calculateNextQuarterEnd().difference(DateTime.now()).inSeconds;
         }
       });
     });
